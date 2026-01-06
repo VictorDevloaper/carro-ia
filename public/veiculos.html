@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veículos - CarroIA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        body.page-loaded {
+            opacity: 1;
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(14, 165, 233, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(14, 165, 233, 0.6);
+            }
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: rotate(0deg);
+            }
+
+            25% {
+                transform: rotate(-5deg);
+            }
+
+            75% {
+                transform: rotate(5deg);
+            }
+        }
+
+        @keyframes ripple {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        .animate-fade-up {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .animate-glow {
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0);
+            animation: ripple 0.6s linear;
+            pointer-events: none;
+            width: 100px;
+            height: 100px;
+            margin: -50px;
+        }
+
+        button,
+        a {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link {
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover {
+            background: rgba(14, 165, 233, 0.1);
+            transform: translateX(5px);
+        }
+
+        .nav-link.active {
+            background: linear-gradient(90deg, rgba(14, 165, 233, 0.2) 0%, transparent 100%);
+            border-left: 3px solid #0ea5e9;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 10px 30px rgba(14, 165, 233, 0.5);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.95);
+        }
+
+        .vehicle-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .vehicle-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            border-color: rgba(14, 165, 233, 0.5);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(14, 165, 233, 0.2);
+        }
+
+        .vehicle-card:hover .car-icon {
+            animation: shake 0.5s ease;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 50;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            transform: scale(0.8) translateY(50px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .input-field {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: all 0.3s;
+        }
+
+        .input-field:focus {
+            border-color: #0ea5e9;
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.2);
+            transform: scale(1.02);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 16px 24px;
+            border-radius: 12px;
+            color: white;
+            z-index: 100;
+            transform: translateY(100px) scale(0.8);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .toast.show {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
+        }
+
+        .sidebar {
+            transition: transform 0.3s ease-out;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 35;
+        }
+
+        .sidebar-overlay.open {
+            display: block;
+        }
+
+        .delete-btn {
+            transition: all 0.3s;
+        }
+
+        .delete-btn:hover {
+            transform: scale(1.3) rotate(15deg);
+            color: #ef4444;
+        }
+    </style>
+</head>
+
+<body class="text-gray-100">
+    <header class="md:hidden fixed top-0 left-0 right-0 glass-card z-30 px-4 py-3 flex items-center justify-between">
+        <button onclick="toggleSidebar()" class="p-2"><svg class="w-6 h-6" fill="none" stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg></button>
+        <span class="font-bold"><span class="animate-float inline-block">🚗</span> CarroIA</span>
+        <button onclick="openModal()" class="p-2 text-sky-400 animate-pulse">➕</button>
+    </header>
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <aside id="sidebar" class="sidebar fixed left-0 top-0 h-full w-52 glass-card z-40 flex flex-col">
+        <div class="p-4 border-b border-slate-700/50">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center animate-glow">
+                    <span class="text-xl animate-float">🚗</span>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold">CarroIA</h1>
+                    <p class="text-xs text-slate-400">Gestão de Manutenção</p>
+                </div>
+            </div>
+        </div>
+        <nav class="flex-1 p-3 space-y-0.5">
+            <a href="index.html" class="nav-link flex items-center gap-2 px-3 py-2 rounded-lg text-slate-300 text-sm">📊
+                Dashboard</a>
+            <a href="veiculos.html"
+                class="nav-link active flex items-center gap-2 px-3 py-2 rounded-lg text-slate-300 text-sm">🚙
+                Veículos</a>
+            <a href="manutencoes.html"
+                class="nav-link flex items-center gap-2 px-3 py-2 rounded-lg text-slate-300 text-sm">🔧 Manutenções</a>
+        </nav>
+    </aside>
+    <main class="md:ml-52 p-4 md:p-8 pt-20 md:pt-8">
+        <header
+            class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-up">
+            <div>
+                <h2 class="text-2xl md:text-3xl font-bold mb-1">Veículos</h2>
+                <p class="text-slate-400 text-sm">Gerencie seus veículos</p>
+            </div>
+            <button onclick="openModal()"
+                class="hidden md:flex btn-primary px-6 py-3 rounded-xl text-white font-medium items-center gap-2"><span
+                    class="animate-pulse">➕</span> Novo Veículo</button>
+        </header>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="veiculos-grid">
+            <div class="col-span-full text-center py-12 text-slate-500 animate-fade-up"><span
+                    class="text-5xl block mb-3 animate-float">🚙</span>
+                <p>Nenhum veículo cadastrado</p>
+            </div>
+        </div>
+    </main>
+    <div id="modal-veiculo" class="modal">
+        <div class="modal-content glass-card rounded-2xl p-6 w-full max-w-lg">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold">Novo Veículo</h3><button onclick="closeModal()"
+                    class="text-2xl hover:rotate-90 transition-transform">&times;</button>
+            </div>
+            <form id="form-veiculo" class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs text-slate-300 mb-1">Marca *</label><input type="text" name="marca"
+                            required class="input-field w-full px-3 py-2 rounded-xl text-white outline-none"></div>
+                    <div><label class="block text-xs text-slate-300 mb-1">Modelo *</label><input type="text"
+                            name="modelo" required
+                            class="input-field w-full px-3 py-2 rounded-xl text-white outline-none"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs text-slate-300 mb-1">Ano</label><input type="number" name="ano"
+                            class="input-field w-full px-3 py-2 rounded-xl text-white outline-none"></div>
+                    <div><label class="block text-xs text-slate-300 mb-1">Placa</label><input type="text" name="placa"
+                            class="input-field w-full px-3 py-2 rounded-xl text-white outline-none uppercase"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs text-slate-300 mb-1">Cor</label><input type="text" name="cor"
+                            class="input-field w-full px-3 py-2 rounded-xl text-white outline-none"></div>
+                    <div><label class="block text-xs text-slate-300 mb-1">KM Atual</label><input type="number"
+                            name="km_atual" class="input-field w-full px-3 py-2 rounded-xl text-white outline-none">
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeModal()"
+                        class="flex-1 py-2 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-700/50 transition-all">Cancelar</button>
+                    <button type="submit"
+                        class="flex-1 btn-primary py-2 rounded-xl text-white font-medium">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="toast" class="toast"></div>
+    <script src="js/app.js"></script>
+    <script>
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('open'); }
+        document.addEventListener('DOMContentLoaded', async () => { document.body.classList.add('page-loaded'); await loadVeiculos(); if (window.location.hash === '#novo') openModal(); });
+        async function loadVeiculos() {
+            const response = await fetch('/api/veiculos'); const veiculos = await response.json(); const grid = document.getElementById('veiculos-grid');
+            if (!veiculos.length) { grid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-500 animate-fade-up"><span class="text-5xl block mb-3 animate-float">🚙</span><p>Nenhum veículo</p></div>'; return; }
+            grid.innerHTML = veiculos.map((v, i) => `
+        <div class="vehicle-card rounded-xl p-4 animate-fade-up" style="animation-delay: ${i * 0.1}s; opacity: 0;">
+          <div class="flex justify-between mb-3"><div class="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center text-2xl car-icon">🚗</div><button onclick="deleteVeiculo(${v.id})" class="delete-btn text-slate-500">🗑️</button></div>
+          <h3 class="text-lg font-bold mb-1">${v.marca} ${v.modelo}</h3><p class="text-slate-400 text-xs mb-3">${v.ano || ''}</p>
+          <div class="space-y-1 text-xs text-slate-300">${v.placa ? '<div>🏷️ ' + v.placa + '</div>' : ''}${v.cor ? '<div>🎨 ' + v.cor + '</div>' : ''}<div>📍 ${v.km_atual?.toLocaleString() || 0} km</div></div>
+          <a href="manutencoes.html?veiculo=${v.id}" class="mt-3 block text-center py-2 rounded-lg border border-slate-600 text-xs hover:bg-sky-500/10 hover:border-sky-500/50 transition-all">Ver Manutenções</a>
+        </div>`).join('');
+        }
+        function openModal() { document.getElementById('modal-veiculo').classList.add('active'); }
+        function closeModal() { document.getElementById('modal-veiculo').classList.remove('active'); document.getElementById('form-veiculo').reset(); }
+        document.getElementById('form-veiculo').addEventListener('submit', async (e) => {
+            e.preventDefault(); const data = Object.fromEntries(new FormData(e.target));
+            if (data.ano) data.ano = parseInt(data.ano); if (data.km_atual) data.km_atual = parseInt(data.km_atual);
+            const res = await fetch('/api/veiculos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            if (res.ok) { showToast('Veículo cadastrado! 🚗', 'success'); closeModal(); await loadVeiculos(); } else showToast('Erro ao cadastrar', 'error');
+        });
+        async function deleteVeiculo(id) { if (!confirm('Excluir este veículo?')) return; await fetch('/api/veiculos/' + id, { method: 'DELETE' }); showToast('Veículo excluído!', 'success'); loadVeiculos(); }
+    </script>
+</body>
+
+</html>

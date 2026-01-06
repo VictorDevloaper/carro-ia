@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CarroIA - Manutenção de Veículos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      min-height: 100vh;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    body.page-loaded {
+      opacity: 1;
+    }
+
+    .glass-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.05);
+      }
+    }
+
+    @keyframes glow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 5px rgba(14, 165, 233, 0.3);
+      }
+
+      50% {
+        box-shadow: 0 0 20px rgba(14, 165, 233, 0.6), 0 0 40px rgba(14, 165, 233, 0.3);
+      }
+    }
+
+    @keyframes float {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: -200% 0;
+      }
+
+      100% {
+        background-position: 200% 0;
+      }
+    }
+
+    @keyframes bounce {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-5px);
+      }
+    }
+
+    @keyframes ripple {
+      to {
+        transform: scale(4);
+        opacity: 0;
+      }
+    }
+
+    .animate-fade-up {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+
+    .animate-fade-left {
+      animation: fadeInLeft 0.5s ease forwards;
+    }
+
+    .animate-pulse-hover:hover {
+      animation: pulse 0.5s ease;
+    }
+
+    .animate-glow {
+      animation: glow 2s ease-in-out infinite;
+    }
+
+    .animate-float {
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .animate-bounce {
+      animation: bounce 1s ease infinite;
+    }
+
+    .stagger-1 {
+      animation-delay: 0.1s;
+      opacity: 0;
+    }
+
+    .stagger-2 {
+      animation-delay: 0.2s;
+      opacity: 0;
+    }
+
+    .stagger-3 {
+      animation-delay: 0.3s;
+      opacity: 0;
+    }
+
+    .stagger-4 {
+      animation-delay: 0.4s;
+      opacity: 0;
+    }
+
+    /* Ripple effect */
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(0);
+      animation: ripple 0.6s linear;
+      pointer-events: none;
+      width: 100px;
+      height: 100px;
+      margin-left: -50px;
+      margin-top: -50px;
+    }
+
+    button,
+    a {
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Shimmer loading effect */
+    .shimmer {
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+
+    /* Cards */
+    .stat-card {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .stat-card:hover {
+      transform: translateY(-8px) scale(1.02);
+      border-color: rgba(14, 165, 233, 0.5);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 30px rgba(14, 165, 233, 0.2);
+    }
+
+    .stat-card:active {
+      transform: scale(0.98);
+    }
+
+    /* Navigation */
+    .nav-link {
+      transition: all 0.3s ease;
+    }
+
+    .nav-link:hover {
+      background: rgba(14, 165, 233, 0.1);
+      transform: translateX(5px);
+    }
+
+    .nav-link.active {
+      background: linear-gradient(90deg, rgba(14, 165, 233, 0.2) 0%, transparent 100%);
+      border-left: 3px solid #0ea5e9;
+    }
+
+    /* Buttons */
+    .btn-primary {
+      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 10px 30px rgba(14, 165, 233, 0.5);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.95);
+    }
+
+    /* Icon badges */
+    .icon-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover .icon-badge {
+      transform: scale(1.2) rotate(10deg);
+    }
+
+    /* Maintenance rows */
+    .maintenance-row {
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+
+    .maintenance-row:hover {
+      background: rgba(14, 165, 233, 0.08);
+      border-color: rgba(14, 165, 233, 0.3);
+      transform: translateX(8px);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 16px 24px;
+      border-radius: 12px;
+      color: white;
+      z-index: 100;
+      transform: translateY(100px) scale(0.8);
+      opacity: 0;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .toast.show {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+
+    .toast.success {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+    }
+
+    .toast.error {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Sidebar */
+    .sidebar {
+      transition: transform 0.3s ease-out;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+    }
+
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 35;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .sidebar-overlay.open {
+      display: block;
+      opacity: 1;
+    }
+
+    /* Attention grabbers */
+    .attention-badge {
+      animation: pulse 2s infinite, glow 2s infinite;
+    }
+
+    .new-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      background: #ef4444;
+      color: white;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      animation: bounce 1s infinite;
+    }
+
+    /* Number counter animation */
+    .counter {
+      transition: all 0.5s ease;
+    }
+  </style>
+</head>
+
+<body class="text-gray-100">
+  <header class="md:hidden fixed top-0 left-0 right-0 glass-card z-30 px-4 py-3 flex items-center justify-between">
+    <button onclick="toggleSidebar()" class="p-2 rounded-lg hover:bg-slate-700/50 transition-all"><svg class="w-6 h-6"
+        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg></button>
+    <div class="flex items-center gap-2"><span class="text-xl animate-float">🚗</span><span
+        class="font-bold">CarroIA</span></div>
+    <div class="w-10"></div>
+  </header>
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+  <aside id="sidebar" class="sidebar fixed left-0 top-0 h-full w-52 glass-card z-40 flex flex-col">
+    <div class="p-4 border-b border-slate-700/50">
+      <div class="flex items-center gap-3">
+        <div
+          class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center animate-glow">
+          <span class="text-xl animate-float">🚗</span>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white">CarroIA</h1>
+          <p class="text-xs text-slate-400">Gestão de Manutenção</p>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 p-3 space-y-0.5">
+      <a href="index.html"
+        class="nav-link active flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:text-white text-sm"><span>📊</span><span
+          class="font-medium">Dashboard</span></a>
+      <a href="veiculos.html"
+        class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:text-white text-sm"><span>🚙</span><span
+          class="font-medium">Veículos</span></a>
+      <a href="manutencoes.html"
+        class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:text-white text-sm"><span>🔧</span><span
+          class="font-medium">Manutenções</span></a>
+    </nav>
+  </aside>
+  <main class="md:ml-52 p-4 md:p-8 pt-20 md:pt-8">
+    <header class="mb-6 md:mb-8 animate-fade-up">
+      <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">Dashboard</h2>
+      <p class="text-slate-400 text-sm md:text-base">Visão geral das manutenções dos seus veículos</p>
+    </header>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
+      <div class="stat-card rounded-xl md:rounded-2xl p-4 md:p-6 animate-fade-up stagger-1">
+        <div class="flex items-center justify-between mb-2 md:mb-4">
+          <div class="icon-badge bg-blue-500/20 text-blue-400 w-8 h-8 md:w-10 md:h-10">🚙</div>
+          <span class="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">Veículos</span>
+        </div>
+        <p class="text-xl md:text-3xl font-bold text-white counter" id="stat-veiculos">0</p>
+        <p class="text-xs md:text-sm text-slate-400 mt-1">cadastrados</p>
+      </div>
+      <div class="stat-card rounded-xl md:rounded-2xl p-4 md:p-6 animate-fade-up stagger-2">
+        <div class="flex items-center justify-between mb-2 md:mb-4">
+          <div class="icon-badge bg-emerald-500/20 text-emerald-400 w-8 h-8 md:w-10 md:h-10">🔧</div>
+          <span class="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">Manutenções</span>
+        </div>
+        <p class="text-xl md:text-3xl font-bold text-white counter" id="stat-manutencoes">0</p>
+        <p class="text-xs md:text-sm text-slate-400 mt-1">registradas</p>
+      </div>
+      <div class="stat-card rounded-xl md:rounded-2xl p-4 md:p-6 animate-fade-up stagger-3">
+        <div class="flex items-center justify-between mb-2 md:mb-4">
+          <div class="icon-badge bg-amber-500/20 text-amber-400 w-8 h-8 md:w-10 md:h-10">💰</div>
+          <span class="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">Total</span>
+        </div>
+        <p class="text-lg md:text-3xl font-bold text-white counter" id="stat-custo-total">R$ 0</p>
+        <p class="text-xs md:text-sm text-slate-400 mt-1">investido</p>
+      </div>
+      <div class="stat-card rounded-xl md:rounded-2xl p-4 md:p-6 animate-fade-up stagger-4">
+        <div class="flex items-center justify-between mb-2 md:mb-4">
+          <div class="icon-badge bg-purple-500/20 text-purple-400 w-8 h-8 md:w-10 md:h-10">📅</div>
+          <span class="text-[10px] md:text-xs text-slate-500 uppercase tracking-wider">Este Mês</span>
+        </div>
+        <p class="text-lg md:text-3xl font-bold text-white counter" id="stat-custo-mes">R$ 0</p>
+        <p class="text-xs md:text-sm text-slate-400 mt-1">gastos</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+      <div class="lg:col-span-2 glass-card rounded-xl md:rounded-2xl p-4 md:p-6 animate-fade-up"
+        style="animation-delay: 0.5s; opacity: 0;">
+        <div class="flex items-center justify-between mb-4 md:mb-6">
+          <h3 class="text-base md:text-lg font-semibold text-white">Últimas Manutenções</h3>
+          <a href="manutencoes.html"
+            class="text-xs md:text-sm text-sky-400 hover:text-sky-300 transition-colors hover:translate-x-1 inline-block">Ver
+            todas →</a>
+        </div>
+        <div class="space-y-2 md:space-y-3" id="lista-manutencoes">
+          <div class="text-center py-6 md:py-8 text-slate-500"><span
+              class="text-3xl md:text-4xl block mb-2 md:mb-3 animate-bounce">🔧</span>
+            <p class="text-sm md:text-base">Nenhuma manutenção registrada</p><a href="manutencoes.html"
+              class="text-sky-400 text-xs md:text-sm hover:underline">Registrar primeira manutenção</a>
+          </div>
+        </div>
+      </div>
+      <div class="glass-card rounded-xl md:rounded-2xl p-4 md:p-6 animate-fade-up"
+        style="animation-delay: 0.6s; opacity: 0;">
+        <h3 class="text-base md:text-lg font-semibold text-white mb-4 md:mb-6">Por Tipo de Serviço</h3>
+        <div class="space-y-3 md:space-y-4" id="lista-tipos">
+          <div class="text-center py-6 md:py-8 text-slate-500"><span
+              class="text-2xl md:text-3xl block mb-2 animate-float">📊</span>
+            <p class="text-xs md:text-sm">Sem dados ainda</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-6 md:mt-8 glass-card rounded-xl md:rounded-2xl p-4 md:p-6 animate-fade-up"
+      style="animation-delay: 0.7s; opacity: 0;">
+      <h3 class="text-base md:text-lg font-semibold text-white mb-3 md:mb-4">Ações Rápidas</h3>
+      <div class="flex flex-col sm:flex-row gap-3 md:gap-4">
+        <a href="veiculos.html#novo"
+          class="btn-primary px-4 md:px-6 py-3 rounded-xl text-white font-medium inline-flex items-center justify-center gap-2 text-sm md:text-base"><span
+            class="animate-bounce">➕</span> Novo Veículo</a>
+        <a href="manutencoes.html#nova"
+          class="btn-primary px-4 md:px-6 py-3 rounded-xl text-white font-medium inline-flex items-center justify-center gap-2 text-sm md:text-base"><span
+            class="animate-bounce">🔧</span> Nova Manutenção</a>
+      </div>
+    </div>
+  </main>
+  <div id="toast" class="toast"></div>
+  <script src="js/app.js"></script>
+  <script>
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('open'); }
+    document.addEventListener('DOMContentLoaded', async () => {
+      document.body.classList.add('page-loaded');
+      await loadDashboard();
+    });
+    function animateCounter(el, target) {
+      let current = 0;
+      const increment = target / 30;
+      const timer = setInterval(() => {
+        current += increment;
+        if (current >= target) { current = target; clearInterval(timer); }
+        el.textContent = Math.floor(current);
+      }, 30);
+    }
+    async function loadDashboard() {
+      try {
+        const response = await fetch('/api/dashboard');
+        const data = await response.json();
+        animateCounter(document.getElementById('stat-veiculos'), data.totalVeiculos);
+        animateCounter(document.getElementById('stat-manutencoes'), data.totalManutencoes);
+        document.getElementById('stat-custo-total').textContent = formatCurrency(data.custoTotal);
+        document.getElementById('stat-custo-mes').textContent = formatCurrency(data.custoMesAtual);
+        const listaManutencoes = document.getElementById('lista-manutencoes');
+        if (data.ultimasManutencoes.length > 0) {
+          listaManutencoes.innerHTML = data.ultimasManutencoes.map((m, i) => `
+            <div class="maintenance-row flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl border border-slate-700/50 animate-fade-up" style="animation-delay: ${0.1 * i}s; opacity: 0;">
+              <div class="icon-badge ${getTipoColor(m.tipo)} w-8 h-8 md:w-10 md:h-10 text-sm md:text-lg">${getTipoIcon(m.tipo)}</div>
+              <div class="flex-1 min-w-0"><p class="font-medium text-white truncate text-sm md:text-base">${m.tipo}</p><p class="text-xs md:text-sm text-slate-400">${m.marca} ${m.modelo} • ${formatDate(m.data)}</p></div>
+              <div class="text-right"><p class="font-semibold text-white text-sm md:text-base">${formatCurrency(m.custo)}</p></div>
+            </div>
+          `).join('');
+        }
+        const listaTipos = document.getElementById('lista-tipos');
+        if (data.manutencoesPorTipo.length > 0) {
+          const maxCount = Math.max(...data.manutencoesPorTipo.map(t => t.count));
+          listaTipos.innerHTML = data.manutencoesPorTipo.map((t, i) => `
+            <div class="space-y-2 animate-fade-up" style="animation-delay: ${0.1 * i}s; opacity: 0;">
+              <div class="flex justify-between text-xs md:text-sm"><span class="text-slate-300">${t.tipo}</span><span class="text-slate-500">${t.count}x • ${formatCurrency(t.custo_total)}</span></div>
+              <div class="h-2 bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-sky-500 to-sky-400 rounded-full transition-all duration-1000" style="width: 0%; animation: growBar 1s ${0.2 * i}s forwards;"></div></div>
+            </div>
+          `).join('');
+          // Animate bars
+          setTimeout(() => {
+            document.querySelectorAll('#lista-tipos .h-2 > div').forEach((bar, i) => {
+              const t = data.manutencoesPorTipo[i];
+              bar.style.width = `${(t.count / maxCount) * 100}%`;
+            });
+          }, 100);
+        }
+      } catch (error) { console.error('Erro:', error); }
+    }
+  </script>
+</body>
+
+</html>

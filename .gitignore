@@ -1,0 +1,23 @@
+# Dependências
+node_modules/
+
+# Arquivos de log
+*.log
+npm-debug.log*
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.*.local
+
+# O banco de dados é persistido, mas incluído no git para facilitar
+# Se quiser ignorar, descomente a linha abaixo:
+# *.db
