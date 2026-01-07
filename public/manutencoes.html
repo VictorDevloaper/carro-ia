@@ -341,9 +341,10 @@
     <div id="modal-manutencao" class="modal">
         <div class="modal-content glass-card rounded-2xl p-5 w-full max-w-lg my-4">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold">Nova Manutenção</h3><button onclick="closeModal()"
+                <h3 id="modal-titulo" class="text-lg font-bold">Nova Manutenção</h3><button onclick="closeModal()"
                     class="text-2xl hover:rotate-90 transition-transform">&times;</button>
             </div>
+            <input type="hidden" id="edit-id" value="">
             <form id="form-manutencao" class="space-y-4">
                 <div><label class="block text-xs text-slate-300 mb-1">Veículo *</label><select name="veiculo_id"
                         id="select-veiculo" required
@@ -469,21 +470,64 @@
             <p class="font-bold text-sm">${formatCurrency(m.custo)}</p>
             <p class="text-[10px] text-slate-500">${formatDate(m.data)}</p>
           </div>
-          <button onclick="deleteManutencao(${m.id})" class="delete-btn text-slate-500 p-1">🗑️</button>
+          <div class="flex gap-1">
+            <button onclick='editManutencao(${JSON.stringify(m).replace(/'/g, "&#39;")})' class="edit-btn text-slate-500 p-1 hover:text-sky-400 transition-all" title="Editar">✏️</button>
+            <button onclick="deleteManutencao(${m.id})" class="delete-btn text-slate-500 p-1" title="Excluir">🗑️</button>
+          </div>
         </div>`;
             }).join('');
         }
-        function openModal() { document.getElementById('modal-manutencao').classList.add('active'); }
-        function closeModal() { document.getElementById('modal-manutencao').classList.remove('active'); document.getElementById('form-manutencao').reset(); document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected')); tipoSelecionado = ''; document.querySelector('input[name="data"]').valueAsDate = new Date(); }
+        function openModal(isEdit = false) {
+            document.getElementById('modal-titulo').textContent = isEdit ? 'Editar Manutenção' : 'Nova Manutenção';
+            document.getElementById('modal-manutencao').classList.add('active');
+        }
+        function closeModal() {
+            document.getElementById('modal-manutencao').classList.remove('active');
+            document.getElementById('form-manutencao').reset();
+            document.getElementById('edit-id').value = '';
+            document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected'));
+            tipoSelecionado = '';
+            document.querySelector('input[name="data"]').valueAsDate = new Date();
+        }
+        function editManutencao(m) {
+            document.getElementById('edit-id').value = m.id;
+            document.querySelector('[name="veiculo_id"]').value = m.veiculo_id;
+            document.querySelector('[name="descricao"]').value = m.descricao || '';
+            document.querySelector('[name="data"]').value = m.data;
+            document.querySelector('[name="km"]').value = m.km || '';
+            document.querySelector('[name="custo"]').value = m.custo ? m.custo.toString().replace('.', ',') : '';
+            document.querySelector('[name="local"]').value = m.local || '';
+            document.querySelector('[name="proximo_km"]').value = m.proximo_km || '';
+            document.querySelector('[name="proxima_data"]').value = m.proxima_data || '';
+            // Selecionar tipo
+            document.querySelectorAll('.tipo-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.dataset.tipo === m.tipo) {
+                    btn.classList.add('selected');
+                    tipoSelecionado = m.tipo;
+                    document.getElementById('input-tipo').value = m.tipo;
+                }
+            });
+            openModal(true);
+        }
         document.getElementById('form-manutencao').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!tipoSelecionado) { showToast('Selecione um tipo!', 'error'); return; }
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
             data.veiculo_id = parseInt(data.veiculo_id);
-            // Os campos km, custo, proximo_km são enviados como string e convertidos no servidor
-            const res = await fetch('/api/manutencoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-            if (res.ok) { showToast('Manutenção registrada! 🔧', 'success'); closeModal(); loadManutencoes(); } else showToast('Erro ao registrar', 'error');
+
+            const editId = document.getElementById('edit-id').value;
+            const isEdit = editId !== '';
+            const url = isEdit ? `/api/manutencoes/${editId}` : '/api/manutencoes';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            if (res.ok) {
+                showToast(isEdit ? 'Manutenção atualizada! ✅' : 'Manutenção registrada! 🔧', 'success');
+                closeModal();
+                loadManutencoes();
+            } else showToast('Erro ao salvar', 'error');
         });
         async function deleteManutencao(id) { if (!confirm('Excluir esta manutenção?')) return; await fetch('/api/manutencoes/' + id, { method: 'DELETE' }); showToast('Manutenção excluída!', 'success'); loadManutencoes(); }
     </script>
