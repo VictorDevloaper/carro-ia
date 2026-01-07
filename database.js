@@ -48,10 +48,20 @@ async function initDatabase() {
       custo REAL DEFAULT 0,
       local TEXT,
       observacoes TEXT,
+      proximo_km INTEGER,
+      proxima_data DATE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (veiculo_id) REFERENCES veiculos(id) ON DELETE CASCADE
     )
   `);
+
+  // Migração: Adicionar colunas se não existirem (para bancos existentes)
+  try {
+    db.run(`ALTER TABLE manutencoes ADD COLUMN proximo_km INTEGER`);
+  } catch (e) { /* Coluna já existe */ }
+  try {
+    db.run(`ALTER TABLE manutencoes ADD COLUMN proxima_data DATE`);
+  } catch (e) { /* Coluna já existe */ }
 
   saveDatabase();
   return db;

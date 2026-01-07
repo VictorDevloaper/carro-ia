@@ -387,15 +387,27 @@
                     <div><label class="block text-xs text-slate-300 mb-1">Data *</label><input type="date" name="data"
                             required class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm">
                     </div>
-                    <div><label class="block text-xs text-slate-300 mb-1">KM</label><input type="number" name="km"
+                    <div><label class="block text-xs text-slate-300 mb-1">KM Atual</label><input type="text"
+                            inputmode="numeric" pattern="[0-9]*" name="km" placeholder="Ex: 104092"
                             class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm"></div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <div><label class="block text-xs text-slate-300 mb-1">Custo (R$)</label><input type="number"
-                            name="custo" step="0.01"
+                    <div><label class="block text-xs text-slate-300 mb-1">Custo (R$)</label><input type="text"
+                            inputmode="decimal" name="custo" placeholder="Ex: 150,00"
                             class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm"></div>
                     <div><label class="block text-xs text-slate-300 mb-1">Local</label><input type="text" name="local"
                             class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm"></div>
+                </div>
+                <div class="border-t border-slate-700/50 pt-4 mt-2">
+                    <p class="text-xs text-sky-400 mb-3 font-medium">📅 Próxima Manutenção (opcional)</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="block text-xs text-slate-300 mb-1">Próximo KM</label><input type="text"
+                                inputmode="numeric" pattern="[0-9]*" name="proximo_km" placeholder="Ex: 114092"
+                                class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm"></div>
+                        <div><label class="block text-xs text-slate-300 mb-1">Próxima Data</label><input type="date"
+                                name="proxima_data"
+                                class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm"></div>
+                    </div>
                 </div>
                 <div class="flex gap-3 pt-2">
                     <button type="button" onclick="closeModal()"
@@ -437,26 +449,39 @@
             const manutencoes = await (await fetch(url)).json();
             const lista = document.getElementById('manutencoes-lista');
             if (!manutencoes.length) { lista.innerHTML = '<div class="text-center py-12 text-slate-500 animate-fade-up"><span class="text-5xl block mb-3 animate-float">🔧</span><p>Nenhuma manutenção</p></div>'; return; }
-            lista.innerHTML = manutencoes.map((m, i) => `
+            lista.innerHTML = manutencoes.map((m, i) => {
+                let proximaInfo = '';
+                if (m.proximo_km || m.proxima_data) {
+                    const partes = [];
+                    if (m.proximo_km) partes.push(`${m.proximo_km.toLocaleString('pt-BR')} km`);
+                    if (m.proxima_data) partes.push(formatDate(m.proxima_data));
+                    proximaInfo = `<p class="text-[10px] text-amber-400 mt-0.5">📅 Próx: ${partes.join(' ou ')}</p>`;
+                }
+                return `
         <div class="maintenance-row rounded-xl p-3 md:p-4 flex items-center gap-3 animate-fade-up" style="animation-delay: ${i * 0.08}s; opacity: 0;">
           <div class="icon-badge ${getTipoColor(m.tipo)}">${getTipoIcon(m.tipo)}</div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-0.5"><h4 class="font-semibold text-sm">${m.tipo}</h4><span class="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400">${m.marca} ${m.modelo}</span></div>
-            <p class="text-xs text-slate-400 truncate">${m.descricao || 'Sem descrição'}</p>
+            <p class="text-xs text-slate-400 truncate">${m.descricao || 'Sem descrição'}${m.km ? ` • ${m.km.toLocaleString('pt-BR')} km` : ''}</p>
+            ${proximaInfo}
           </div>
           <div class="text-right flex-shrink-0">
             <p class="font-bold text-sm">${formatCurrency(m.custo)}</p>
             <p class="text-[10px] text-slate-500">${formatDate(m.data)}</p>
           </div>
           <button onclick="deleteManutencao(${m.id})" class="delete-btn text-slate-500 p-1">🗑️</button>
-        </div>`).join('');
+        </div>`;
+            }).join('');
         }
         function openModal() { document.getElementById('modal-manutencao').classList.add('active'); }
         function closeModal() { document.getElementById('modal-manutencao').classList.remove('active'); document.getElementById('form-manutencao').reset(); document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected')); tipoSelecionado = ''; document.querySelector('input[name="data"]').valueAsDate = new Date(); }
         document.getElementById('form-manutencao').addEventListener('submit', async (e) => {
-            e.preventDefault(); if (!tipoSelecionado) { showToast('Selecione um tipo!', 'error'); return; }
-            const data = Object.fromEntries(new FormData(e.target));
-            data.veiculo_id = parseInt(data.veiculo_id); if (data.km) data.km = parseInt(data.km); if (data.custo) data.custo = parseFloat(data.custo);
+            e.preventDefault();
+            if (!tipoSelecionado) { showToast('Selecione um tipo!', 'error'); return; }
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            data.veiculo_id = parseInt(data.veiculo_id);
+            // Os campos km, custo, proximo_km são enviados como string e convertidos no servidor
             const res = await fetch('/api/manutencoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
             if (res.ok) { showToast('Manutenção registrada! 🔧', 'success'); closeModal(); loadManutencoes(); } else showToast('Erro ao registrar', 'error');
         });

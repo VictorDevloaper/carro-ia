@@ -100,17 +100,36 @@ app.get('/api/manutencoes', (req, res) => {
 // Criar manutenção
 app.post('/api/manutencoes', (req, res) => {
     try {
-        const { veiculo_id, tipo, descricao, data, km, custo, local, observacoes } = req.body;
+        const { veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data } = req.body;
+
+        // Converter custo de string formatada para número
+        let custoNumero = 0;
+        if (custo) {
+            custoNumero = parseFloat(String(custo).replace(',', '.')) || 0;
+        }
+
+        // Converter km de string para número
+        let kmNumero = null;
+        if (km) {
+            kmNumero = parseInt(String(km).replace(/\D/g, '')) || null;
+        }
+
+        // Converter proximo_km de string para número
+        let proximoKmNumero = null;
+        if (proximo_km) {
+            proximoKmNumero = parseInt(String(proximo_km).replace(/\D/g, '')) || null;
+        }
+
         const result = prepare(`
-      INSERT INTO manutencoes (veiculo_id, tipo, descricao, data, km, custo, local, observacoes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(veiculo_id, tipo, descricao || null, data, km || null, custo || 0, local || null, observacoes || null);
+      INSERT INTO manutencoes (veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(veiculo_id, tipo, descricao || null, data, kmNumero, custoNumero, local || null, observacoes || null, proximoKmNumero, proxima_data || null);
 
         // Atualizar km do veículo se informado
-        if (km) {
+        if (kmNumero) {
             const veiculo = prepare('SELECT km_atual FROM veiculos WHERE id = ?').get(veiculo_id);
-            if (veiculo && (!veiculo.km_atual || km > veiculo.km_atual)) {
-                prepare('UPDATE veiculos SET km_atual = ? WHERE id = ?').run(km, veiculo_id);
+            if (veiculo && (!veiculo.km_atual || kmNumero > veiculo.km_atual)) {
+                prepare('UPDATE veiculos SET km_atual = ? WHERE id = ?').run(kmNumero, veiculo_id);
             }
         }
 
