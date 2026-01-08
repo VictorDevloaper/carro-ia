@@ -9,7 +9,31 @@ function formatCurrency(value) {
 
 function formatDate(dateString) {
     if (!dateString) return '';
-    const date = new Date(dateString + 'T00:00:00');
+
+    // Se já é um objeto Date ou string de data válida
+    let date;
+
+    // Tenta parsear diferentes formatos
+    if (typeof dateString === 'string') {
+        // Remove qualquer parte de timezone se existir
+        const cleanDate = dateString.split('T')[0];
+        // Formato YYYY-MM-DD
+        if (cleanDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            date = new Date(cleanDate + 'T00:00:00');
+        } else {
+            date = new Date(dateString);
+        }
+    } else if (dateString instanceof Date) {
+        date = dateString;
+    } else {
+        date = new Date(dateString);
+    }
+
+    // Verifica se a data é válida
+    if (isNaN(date.getTime())) {
+        return '';
+    }
+
     return date.toLocaleDateString('pt-BR', {
         day: '2-digit',
         month: 'short',
