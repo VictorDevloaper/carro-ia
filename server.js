@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { initDatabase, prepare, saveDatabase } = require('./database');
+const { initDatabase, query } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,50 +14,52 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ============ API VEÍCULOS ============
 
 // Listar todos os veículos
-app.get('/api/veiculos', (req, res) => {
+app.get('/api/veiculos', async (req, res) => {
     try {
-        const veiculos = prepare('SELECT * FROM veiculos ORDER BY created_at DESC').all();
-        res.json(veiculos);
+        const result = await query('SELECT * FROM veiculos ORDER BY created_at DESC');
+        res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 // Buscar veículo por ID
-app.get('/api/veiculos/:id', (req, res) => {
+app.get('/api/veiculos/:id', async (req, res) => {
     try {
-        const veiculo = prepare('SELECT * FROM veiculos WHERE id = ?').get(parseInt(req.params.id));
-        if (!veiculo) {
+        const result = await query('SELECT * FROM veiculos WHERE id = $1', [parseInt(req.params.id)]);
+        if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Veículo não encontrado' });
         }
-        res.json(veiculo);
+        res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 // Criar veículo
-app.post('/api/veiculos', (req, res) => {
+app.post('/api/veiculos', async (req, res) => {
     try {
         const { marca, modelo, ano, placa, cor, km_atual } = req.body;
-        const result = prepare(`
-      INSERT INTO veiculos (marca, modelo, ano, placa, cor, km_atual)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(marca, modelo, ano || null, placa || null, cor || null, km_atual || 0);
-        res.status(201).json({ id: result.lastInsertRowid, message: 'Veículo criado com sucesso' });
+        const result = await query(
+            `INSERT INTO veiculos (marca, modelo, ano, placa, cor, km_atual)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+            [marca, modelo, ano || null, placa || null, cor || null, km_atual || 0]
+        );
+        res.status(201).json({ id: result.rows[0].id, message: 'Veículo criado com sucesso' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 // Atualizar veículo
-app.put('/api/veiculos/:id', (req, res) => {
+app.put('/api/veiculos/:id', async (req, res) => {
     try {
         const { marca, modelo, ano, placa, cor, km_atual } = req.body;
-        prepare(`
-      UPDATE veiculos SET marca = ?, modelo = ?, ano = ?, placa = ?, cor = ?, km_atual = ?
-      WHERE id = ?
-    `).run(marca, modelo, ano, placa, cor, km_atual, parseInt(req.params.id));
+        await query(
+            `UPDATE veiculos SET marca = $1, modelo = $2, ano = $3, placa = $4, cor = $5, km_atual = $6
+             WHERE id = $7`,
+            [marca, modelo, ano, placa, cor, km_atual, parseInt(req.params.id)]
+        );
         res.json({ message: 'Veículo atualizado com sucesso' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -65,10 +67,10 @@ app.put('/api/veiculos/:id', (req, res) => {
 });
 
 // Deletar veículo
-app.delete('/api/veiculos/:id', (req, res) => {
+app.delete('/api/veiculos/:id', async (req, res) => {
     try {
-        prepare('DELETE FROM manutencoes WHERE veiculo_id = ?').run(parseInt(req.params.id));
-        prepare('DELETE FROM veiculos WHERE id = ?').run(parseInt(req.params.id));
+        await query('DELETE FROM manutencoes WHERE veiculo_id = $1', [parseInt(req.params.id)]);
+        await query('DELETE FROM veiculos WHERE id = $1', [parseInt(req.params.id)]);
         res.json({ message: 'Veículo deletado com sucesso' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -78,27 +80,29 @@ app.delete('/api/veiculos/:id', (req, res) => {
 // ============ API MANUTENÇÕES ============
 
 // Listar todas as manutenções
-app.get('/api/manutencoes', (req, res) => {
+app.get('/api/manutencoes', async (req, res) => {
     try {
         const { veiculo_id } = req.query;
         let sql = `
-      SELECT m.*, v.marca, v.modelo, v.placa
-      FROM manutencoes m
-      JOIN veiculos v ON m.veiculo_id = v.id
-    `;
+            SELECT m.*, v.marca, v.modelo, v.placa
+            FROM manutencoes m
+            JOIN veiculos v ON m.veiculo_id = v.id
+        `;
+        const params = [];
         if (veiculo_id) {
-            sql += ` WHERE m.veiculo_id = ${parseInt(veiculo_id)}`;
+            sql += ` WHERE m.veiculo_id = $1`;
+            params.push(parseInt(veiculo_id));
         }
         sql += ' ORDER BY m.data DESC, m.created_at DESC';
-        const manutencoes = prepare(sql).all();
-        res.json(manutencoes);
+        const result = await query(sql, params);
+        res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 // Criar manutenção
-app.post('/api/manutencoes', (req, res) => {
+app.post('/api/manutencoes', async (req, res) => {
     try {
         const { veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data } = req.body;
 
@@ -120,27 +124,29 @@ app.post('/api/manutencoes', (req, res) => {
             proximoKmNumero = parseInt(String(proximo_km).replace(/\D/g, '')) || null;
         }
 
-        const result = prepare(`
-      INSERT INTO manutencoes (veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(veiculo_id, tipo, descricao || null, data, kmNumero, custoNumero, local || null, observacoes || null, proximoKmNumero, proxima_data || null);
+        const result = await query(
+            `INSERT INTO manutencoes (veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+            [veiculo_id, tipo, descricao || null, data, kmNumero, custoNumero, local || null, observacoes || null, proximoKmNumero, proxima_data || null]
+        );
 
         // Atualizar km do veículo se informado
         if (kmNumero) {
-            const veiculo = prepare('SELECT km_atual FROM veiculos WHERE id = ?').get(veiculo_id);
+            const veiculoResult = await query('SELECT km_atual FROM veiculos WHERE id = $1', [veiculo_id]);
+            const veiculo = veiculoResult.rows[0];
             if (veiculo && (!veiculo.km_atual || kmNumero > veiculo.km_atual)) {
-                prepare('UPDATE veiculos SET km_atual = ? WHERE id = ?').run(kmNumero, veiculo_id);
+                await query('UPDATE veiculos SET km_atual = $1 WHERE id = $2', [kmNumero, veiculo_id]);
             }
         }
 
-        res.status(201).json({ id: result.lastInsertRowid, message: 'Manutenção registrada com sucesso' });
+        res.status(201).json({ id: result.rows[0].id, message: 'Manutenção registrada com sucesso' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 // Atualizar manutenção
-app.put('/api/manutencoes/:id', (req, res) => {
+app.put('/api/manutencoes/:id', async (req, res) => {
     try {
         const { veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data } = req.body;
 
@@ -162,19 +168,21 @@ app.put('/api/manutencoes/:id', (req, res) => {
             proximoKmNumero = parseInt(String(proximo_km).replace(/\D/g, '')) || null;
         }
 
-        prepare(`
-            UPDATE manutencoes SET 
-                veiculo_id = ?, tipo = ?, descricao = ?, data = ?, 
-                km = ?, custo = ?, local = ?, observacoes = ?,
-                proximo_km = ?, proxima_data = ?
-            WHERE id = ?
-        `).run(veiculo_id, tipo, descricao || null, data, kmNumero, custoNumero, local || null, observacoes || null, proximoKmNumero, proxima_data || null, parseInt(req.params.id));
+        await query(
+            `UPDATE manutencoes SET 
+                veiculo_id = $1, tipo = $2, descricao = $3, data = $4, 
+                km = $5, custo = $6, local = $7, observacoes = $8,
+                proximo_km = $9, proxima_data = $10
+             WHERE id = $11`,
+            [veiculo_id, tipo, descricao || null, data, kmNumero, custoNumero, local || null, observacoes || null, proximoKmNumero, proxima_data || null, parseInt(req.params.id)]
+        );
 
         // Atualizar km do veículo se informado
         if (kmNumero) {
-            const veiculo = prepare('SELECT km_atual FROM veiculos WHERE id = ?').get(veiculo_id);
+            const veiculoResult = await query('SELECT km_atual FROM veiculos WHERE id = $1', [veiculo_id]);
+            const veiculo = veiculoResult.rows[0];
             if (veiculo && (!veiculo.km_atual || kmNumero > veiculo.km_atual)) {
-                prepare('UPDATE veiculos SET km_atual = ? WHERE id = ?').run(kmNumero, veiculo_id);
+                await query('UPDATE veiculos SET km_atual = $1 WHERE id = $2', [kmNumero, veiculo_id]);
             }
         }
 
@@ -185,9 +193,9 @@ app.put('/api/manutencoes/:id', (req, res) => {
 });
 
 // Deletar manutenção
-app.delete('/api/manutencoes/:id', (req, res) => {
+app.delete('/api/manutencoes/:id', async (req, res) => {
     try {
-        prepare('DELETE FROM manutencoes WHERE id = ?').run(parseInt(req.params.id));
+        await query('DELETE FROM manutencoes WHERE id = $1', [parseInt(req.params.id)]);
         res.json({ message: 'Manutenção deletada com sucesso' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -196,42 +204,49 @@ app.delete('/api/manutencoes/:id', (req, res) => {
 
 // ============ API DASHBOARD ============
 
-app.get('/api/dashboard', (req, res) => {
+app.get('/api/dashboard', async (req, res) => {
     try {
-        const totalVeiculos = prepare('SELECT COUNT(*) as count FROM veiculos').get()?.count || 0;
-        const totalManutencoes = prepare('SELECT COUNT(*) as count FROM manutencoes').get()?.count || 0;
-        const custoTotal = prepare('SELECT COALESCE(SUM(custo), 0) as total FROM manutencoes').get()?.total || 0;
+        const totalVeiculosResult = await query('SELECT COUNT(*) as count FROM veiculos');
+        const totalVeiculos = parseInt(totalVeiculosResult.rows[0]?.count) || 0;
+
+        const totalManutencoesResult = await query('SELECT COUNT(*) as count FROM manutencoes');
+        const totalManutencoes = parseInt(totalManutencoesResult.rows[0]?.count) || 0;
+
+        const custoTotalResult = await query('SELECT COALESCE(SUM(custo), 0) as total FROM manutencoes');
+        const custoTotal = parseFloat(custoTotalResult.rows[0]?.total) || 0;
 
         // Custo do mês atual
         const now = new Date();
         const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const custoMesAtual = prepare(`
-      SELECT COALESCE(SUM(custo), 0) as total FROM manutencoes 
-      WHERE substr(data, 1, 7) = ?
-    `).get(mesAtual)?.total || 0;
+        const custoMesAtualResult = await query(
+            `SELECT COALESCE(SUM(custo), 0) as total FROM manutencoes 
+             WHERE TO_CHAR(data, 'YYYY-MM') = $1`,
+            [mesAtual]
+        );
+        const custoMesAtual = parseFloat(custoMesAtualResult.rows[0]?.total) || 0;
 
-        const ultimasManutencoes = prepare(`
-      SELECT m.*, v.marca, v.modelo, v.placa
-      FROM manutencoes m
-      JOIN veiculos v ON m.veiculo_id = v.id
-      ORDER BY m.data DESC, m.created_at DESC
-      LIMIT 5
-    `).all();
+        const ultimasManutencoesResult = await query(`
+            SELECT m.*, v.marca, v.modelo, v.placa
+            FROM manutencoes m
+            JOIN veiculos v ON m.veiculo_id = v.id
+            ORDER BY m.data DESC, m.created_at DESC
+            LIMIT 5
+        `);
 
-        const manutencoesPorTipo = prepare(`
-      SELECT tipo, COUNT(*) as count, SUM(custo) as custo_total
-      FROM manutencoes
-      GROUP BY tipo
-      ORDER BY count DESC
-    `).all();
+        const manutencoesPorTipoResult = await query(`
+            SELECT tipo, COUNT(*) as count, SUM(custo) as custo_total
+            FROM manutencoes
+            GROUP BY tipo
+            ORDER BY count DESC
+        `);
 
         res.json({
             totalVeiculos,
             totalManutencoes,
             custoTotal,
             custoMesAtual,
-            ultimasManutencoes,
-            manutencoesPorTipo
+            ultimasManutencoes: ultimasManutencoesResult.rows,
+            manutencoesPorTipo: manutencoesPorTipoResult.rows
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -249,12 +264,12 @@ async function startServer() {
         console.log('═══════════════════════════════════════════════════════════════');
         console.log('');
         console.log(`   ✅ Servidor rodando na porta ${PORT}`);
+        console.log('   🐘 Conectado ao PostgreSQL');
         console.log('');
         console.log('   📍 Acesse pelo navegador:');
         console.log(`      • Local:      http://localhost:${PORT}`);
         console.log(`      • Rede Local: http://SEU-IP:${PORT}`);
         console.log('');
-        console.log('   💡 Para descobrir seu IP, execute: ipconfig (Windows)');
         console.log('═══════════════════════════════════════════════════════════════');
         console.log('');
     });

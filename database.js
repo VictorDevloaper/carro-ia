@@ -1,112 +1,77 @@
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 
-const dbDir = path.join(__dirname, 'data');
-const dbPath = path.join(dbDir, 'carros.db');
+// Configuração do banco de dados
+// Usa DATABASE_URL do Render em produção, ou conexão local para desenvolvimento
+const connectionString = process.env.DATABASE_URL || 'postgresql://localhost:5432/carros';
 
-// Garantir que o diretório existe
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
-let db = null;
+const pool = new Pool({
+  connectionString,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
 
 async function initDatabase() {
-  const SQL = await initSqlJs();
-
-  // Carregar banco existente ou criar novo
-  if (fs.existsSync(dbPath)) {
-    const buffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(buffer);
-  } else {
-    db = new SQL.Database();
-  }
-
-  // Criar tabelas
-  db.run(`
-    CREATE TABLE IF NOT EXISTS veiculos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      marca TEXT NOT NULL,
-      modelo TEXT NOT NULL,
-      ano INTEGER,
-      placa TEXT UNIQUE,
-      cor TEXT,
-      km_atual INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS manutencoes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      veiculo_id INTEGER NOT NULL,
-      tipo TEXT NOT NULL,
-      descricao TEXT,
-      data DATE NOT NULL,
-      km INTEGER,
-      custo REAL DEFAULT 0,
-      local TEXT,
-      observacoes TEXT,
-      proximo_km INTEGER,
-      proxima_data DATE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (veiculo_id) REFERENCES veiculos(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Migração: Adicionar colunas se não existirem (para bancos existentes)
+  const client = await pool.connect();
   try {
-    db.run(`ALTER TABLE manutencoes ADD COLUMN proximo_km INTEGER`);
-  } catch (e) { /* Coluna já existe */ }
-  try {
-    db.run(`ALTER TABLE manutencoes ADD COLUMN proxima_data DATE`);
-  } catch (e) { /* Coluna já existe */ }
+    // Criar tabela de veículos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS veiculos (
+        id SERIAL PRIMARY KEY,
+        marca TEXT NOT NULL,
+        modelo TEXT NOT NULL,
+        ano INTEGER,
+        placa TEXT UNIQUE,
+        cor TEXT,
+        km_atual INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-  saveDatabase();
-  return db;
-}
+    // Criar tabela de manutenções
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS manutencoes (
+        id SERIAL PRIMARY KEY,
+        veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+        tipo TEXT NOT NULL,
+        descricao TEXT,
+        data DATE NOT NULL,
+        km INTEGER,
+        custo REAL DEFAULT 0,
+        local TEXT,
+        observacoes TEXT,
+        proximo_km INTEGER,
+        proxima_data DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-function saveDatabase() {
-  if (db) {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
+    console.log('✅ Banco de dados inicializado com sucesso!');
+  } finally {
+    client.release();
   }
 }
 
-function getDatabase() {
-  return db;
+// Helper para executar queries
+async function query(sql, params = []) {
+  const result = await pool.query(sql, params);
+  return result;
 }
 
-// Helper functions para simular API do better-sqlite3
+// Funções auxiliares para manter compatibilidade
 function prepare(sql) {
   return {
-    run: (...params) => {
-      db.run(sql, params);
-      saveDatabase();
-      return { lastInsertRowid: db.exec("SELECT last_insert_rowid()")[0]?.values[0]?.[0] };
+    run: async (...params) => {
+      const result = await pool.query(sql, params);
+      return { lastInsertRowid: result.rows[0]?.id };
     },
-    get: (...params) => {
-      const result = db.exec(sql, params);
-      if (result.length === 0 || result[0].values.length === 0) return null;
-      const columns = result[0].columns;
-      const values = result[0].values[0];
-      const row = {};
-      columns.forEach((col, i) => row[col] = values[i]);
-      return row;
+    get: async (...params) => {
+      const result = await pool.query(sql, params);
+      return result.rows[0] || null;
     },
-    all: (...params) => {
-      const result = db.exec(sql, params);
-      if (result.length === 0) return [];
-      const columns = result[0].columns;
-      return result[0].values.map(values => {
-        const row = {};
-        columns.forEach((col, i) => row[col] = values[i]);
-        return row;
-      });
+    all: async (...params) => {
+      const result = await pool.query(sql, params);
+      return result.rows;
     }
   };
 }
 
-module.exports = { initDatabase, getDatabase, saveDatabase, prepare };
+module.exports = { initDatabase, query, prepare, pool };
