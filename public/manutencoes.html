@@ -423,6 +423,28 @@
     <script src="js/app.js"></script>
     <script>
         let tipoSelecionado = '';
+
+        // Converte data do PostgreSQL para formato do input (YYYY-MM-DD)
+        function formatDateForInput(dateValue) {
+            if (!dateValue) return '';
+            // Se já está no formato correto
+            if (typeof dateValue === 'string' && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                return dateValue;
+            }
+            // Se é uma data ISO com timezone
+            if (typeof dateValue === 'string' && dateValue.includes('T')) {
+                return dateValue.split('T')[0];
+            }
+            // Tenta converter de Date object
+            try {
+                const date = new Date(dateValue);
+                if (!isNaN(date.getTime())) {
+                    return date.toISOString().split('T')[0];
+                }
+            } catch (e) { }
+            return '';
+        }
+
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('open'); }
         document.addEventListener('DOMContentLoaded', async () => {
             document.body.classList.add('page-loaded');
@@ -493,12 +515,13 @@
             document.getElementById('edit-id').value = m.id;
             document.querySelector('[name="veiculo_id"]').value = m.veiculo_id;
             document.querySelector('[name="descricao"]').value = m.descricao || '';
-            document.querySelector('[name="data"]').value = m.data;
+            // Formatar data para o input (precisa ser YYYY-MM-DD)
+            document.querySelector('[name="data"]').value = formatDateForInput(m.data);
             document.querySelector('[name="km"]').value = m.km || '';
             document.querySelector('[name="custo"]').value = m.custo ? m.custo.toString().replace('.', ',') : '';
             document.querySelector('[name="local"]').value = m.local || '';
             document.querySelector('[name="proximo_km"]').value = m.proximo_km || '';
-            document.querySelector('[name="proxima_data"]').value = m.proxima_data || '';
+            document.querySelector('[name="proxima_data"]').value = formatDateForInput(m.proxima_data);
             // Selecionar tipo
             document.querySelectorAll('.tipo-btn').forEach(btn => {
                 btn.classList.remove('selected');
