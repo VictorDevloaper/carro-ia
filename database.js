@@ -40,8 +40,20 @@ async function initDatabase() {
         observacoes TEXT,
         proximo_km INTEGER,
         proxima_data DATE,
+        marca_peca TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Adicionar coluna marca_peca se não existir (migration)
+    await client.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='manutencoes' AND column_name='marca_peca') THEN
+          ALTER TABLE manutencoes ADD COLUMN marca_peca TEXT;
+        END IF;
+      END $$;
     `);
 
     console.log('✅ Banco de dados inicializado com sucesso!');

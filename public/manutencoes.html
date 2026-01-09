@@ -341,8 +341,11 @@
     <div id="modal-manutencao" class="modal">
         <div class="modal-content glass-card rounded-2xl p-5 w-full max-w-lg my-4">
             <div class="flex items-center justify-between mb-4">
-                <h3 id="modal-titulo" class="text-lg font-bold">Nova Manutenção</h3><button onclick="closeModal()"
-                    class="text-2xl hover:rotate-90 transition-transform">&times;</button>
+                <div>
+                    <h3 id="modal-titulo" class="text-lg font-bold">Nova Manutenção</h3>
+                    <p id="modal-subtitulo" class="text-xs text-slate-400">Registre os detalhes do serviço realizado</p>
+                </div>
+                <button onclick="closeModal()" class="text-2xl hover:rotate-90 transition-transform">&times;</button>
             </div>
             <input type="hidden" id="edit-id" value="">
             <form id="form-manutencao" class="space-y-4">
@@ -351,6 +354,9 @@
                         class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm">
                         <option value="">Selecione</option>
                     </select></div>
+                <div><label class="block text-xs text-slate-300 mb-1">Marca do Produto/Peça</label><input type="text"
+                        name="marca_peca" placeholder="Ex: Castrol, Pirelli, Bosch"
+                        class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm"></div>
                 <div><label class="block text-xs text-slate-300 mb-2">Tipo *</label>
                     <div class="grid grid-cols-4 gap-2">
                         <button type="button"
@@ -484,7 +490,12 @@
         <div class="maintenance-row rounded-xl p-3 md:p-4 flex items-center gap-3 animate-fade-up" style="animation-delay: ${i * 0.08}s; opacity: 0;">
           <div class="icon-badge ${getTipoColor(m.tipo)}">${getTipoIcon(m.tipo)}</div>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-0.5"><h4 class="font-semibold text-sm">${m.tipo}</h4><span class="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400">${m.marca} ${m.modelo}</span></div>
+            <div class="flex flex-col gap-0.5 mb-0.5">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h4 class="font-semibold text-sm">${m.tipo}</h4>
+              </div>
+              <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 w-fit max-w-[120px] truncate" title="${m.marca} ${m.modelo}">${m.marca} ${m.modelo}</span>
+            </div>
             <p class="text-xs text-slate-400 truncate">${m.descricao || 'Sem descrição'}${m.km ? ` • ${m.km.toLocaleString('pt-BR')} km` : ''}</p>
             ${proximaInfo}
           </div>
@@ -501,6 +512,7 @@
         }
         function openModal(isEdit = false) {
             document.getElementById('modal-titulo').textContent = isEdit ? 'Editar Manutenção' : 'Nova Manutenção';
+            document.getElementById('modal-subtitulo').textContent = isEdit ? 'Atualize os detalhes do serviço' : 'Registre os detalhes do serviço realizado';
             document.getElementById('modal-manutencao').classList.add('active');
         }
         function closeModal() {
@@ -514,6 +526,7 @@
         function editManutencao(m) {
             document.getElementById('edit-id').value = m.id;
             document.querySelector('[name="veiculo_id"]').value = m.veiculo_id;
+            document.querySelector('[name="marca_peca"]').value = m.marca_peca || '';
             document.querySelector('[name="descricao"]').value = m.descricao || '';
             // Formatar data para o input (precisa ser YYYY-MM-DD)
             document.querySelector('[name="data"]').value = formatDateForInput(m.data);

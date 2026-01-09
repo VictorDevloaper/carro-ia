@@ -104,7 +104,7 @@ app.get('/api/manutencoes', async (req, res) => {
 // Criar manutenção
 app.post('/api/manutencoes', async (req, res) => {
     try {
-        const { veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data } = req.body;
+        const { veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data, marca_peca } = req.body;
 
         // Converter custo de string formatada para número
         let custoNumero = 0;
@@ -125,9 +125,9 @@ app.post('/api/manutencoes', async (req, res) => {
         }
 
         const result = await query(
-            `INSERT INTO manutencoes (veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-            [veiculo_id, tipo, descricao || null, data, kmNumero, custoNumero, local || null, observacoes || null, proximoKmNumero, proxima_data || null]
+            `INSERT INTO manutencoes (veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data, marca_peca)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+            [veiculo_id, tipo, descricao || null, data, kmNumero, custoNumero, local || null, observacoes || null, proximoKmNumero, proxima_data || null, marca_peca || null]
         );
 
         // Atualizar km do veículo se informado
@@ -148,7 +148,7 @@ app.post('/api/manutencoes', async (req, res) => {
 // Atualizar manutenção
 app.put('/api/manutencoes/:id', async (req, res) => {
     try {
-        const { veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data } = req.body;
+        const { veiculo_id, tipo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data, marca_peca } = req.body;
 
         // Converter custo de string formatada para número
         let custoNumero = 0;
@@ -172,9 +172,9 @@ app.put('/api/manutencoes/:id', async (req, res) => {
             `UPDATE manutencoes SET 
                 veiculo_id = $1, tipo = $2, descricao = $3, data = $4, 
                 km = $5, custo = $6, local = $7, observacoes = $8,
-                proximo_km = $9, proxima_data = $10
-             WHERE id = $11`,
-            [veiculo_id, tipo, descricao || null, data, kmNumero, custoNumero, local || null, observacoes || null, proximoKmNumero, proxima_data || null, parseInt(req.params.id)]
+                proximo_km = $9, proxima_data = $10, marca_peca = $11
+             WHERE id = $12`,
+            [veiculo_id, tipo, descricao || null, data, kmNumero, custoNumero, local || null, observacoes || null, proximoKmNumero, proxima_data || null, marca_peca || null, parseInt(req.params.id)]
         );
 
         // Atualizar km do veículo se informado
