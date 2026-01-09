@@ -326,6 +326,9 @@
                     class="input-field px-3 py-2 rounded-xl text-white outline-none text-sm flex-1">
                     <option value="">Todos os veículos</option>
                 </select>
+                <button onclick="openExportModal()"
+                    class="hidden md:flex px-4 py-2 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-700/50 transition-all items-center gap-2 text-sm"><span>📄</span>
+                    Exportar</button>
                 <button onclick="openModal()"
                     class="hidden md:flex btn-primary px-6 py-2 rounded-xl text-white font-medium items-center gap-2 text-sm"><span
                         class="animate-pulse">➕</span> Nova Manutenção</button>
@@ -431,6 +434,54 @@
                         class="flex-1 btn-primary py-2 rounded-xl text-white font-medium text-sm">Salvar</button>
                 </div>
             </form>
+        </div>
+    </div>
+    <!-- Modal Exportar -->
+    <div id="modal-exportar" class="modal">
+        <div class="modal-content glass-card rounded-2xl p-5 w-full max-w-md my-4">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-bold">📄 Exportar Relatório</h3>
+                    <p class="text-xs text-slate-400">Escolha o período para exportar</p>
+                </div>
+                <button onclick="closeExportModal()"
+                    class="text-2xl hover:rotate-90 transition-transform">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-300 mb-2">Competência (Mês/Ano)</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select id="export-mes"
+                            class="input-field px-3 py-2 rounded-xl text-white outline-none text-sm">
+                            <option value="01">Janeiro</option>
+                            <option value="02">Fevereiro</option>
+                            <option value="03">Março</option>
+                            <option value="04">Abril</option>
+                            <option value="05">Maio</option>
+                            <option value="06">Junho</option>
+                            <option value="07">Julho</option>
+                            <option value="08">Agosto</option>
+                            <option value="09">Setembro</option>
+                            <option value="10">Outubro</option>
+                            <option value="11">Novembro</option>
+                            <option value="12">Dezembro</option>
+                        </select>
+                        <select id="export-ano"
+                            class="input-field px-3 py-2 rounded-xl text-white outline-none text-sm">
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="exportarRelatorio('competencia')"
+                        class="flex-1 btn-primary py-2 rounded-xl text-white font-medium text-sm">📅 Exportar
+                        Período</button>
+                </div>
+                <div class="border-t border-slate-700/50 pt-4">
+                    <button onclick="exportarRelatorio('tudo')"
+                        class="w-full py-2 rounded-xl border border-sky-500 text-sky-400 hover:bg-sky-500/10 transition-all text-sm">📊
+                        Exportar Tudo</button>
+                </div>
+            </div>
         </div>
     </div>
     <div id="toast" class="toast"></div>
@@ -575,6 +626,135 @@
             } else showToast('Erro ao salvar', 'error');
         });
         async function deleteManutencao(id) { if (!confirm('Excluir esta manutenção?')) return; await fetch('/api/manutencoes/' + id, { method: 'DELETE' }); showToast('Manutenção excluída!', 'success'); loadManutencoes(); }
+
+        // Funções de Exportação
+        function openExportModal() {
+            // Popular select de anos
+            const selectAno = document.getElementById('export-ano');
+            selectAno.innerHTML = '';
+            const anoAtual = new Date().getFullYear();
+            for (let ano = anoAtual; ano >= anoAtual - 5; ano--) {
+                selectAno.add(new Option(ano, ano));
+            }
+            // Selecionar mês atual
+            const mesAtual = String(new Date().getMonth() + 1).padStart(2, '0');
+            document.getElementById('export-mes').value = mesAtual;
+            document.getElementById('modal-exportar').classList.add('active');
+        }
+
+        function closeExportModal() {
+            document.getElementById('modal-exportar').classList.remove('active');
+        }
+
+        async function exportarRelatorio(tipo) {
+            const vid = document.getElementById('filtro-veiculo').value;
+            let url = '/api/manutencoes';
+            let params = [];
+
+            if (vid) params.push(`veiculo_id=${vid}`);
+
+            if (tipo === 'competencia') {
+                const mes = document.getElementById('export-mes').value;
+                const ano = document.getElementById('export-ano').value;
+                params.push(`mes=${mes}`);
+                params.push(`ano=${ano}`);
+            }
+
+            if (params.length > 0) url += '?' + params.join('&');
+
+            try {
+                const manutencoes = await (await fetch(url)).json();
+                if (!manutencoes.length) {
+                    showToast('Nenhuma manutenção encontrada!', 'error');
+                    return;
+                }
+                gerarPDF(manutencoes, tipo);
+                closeExportModal();
+                showToast('Relatório gerado com sucesso! 📄', 'success');
+            } catch (error) {
+                showToast('Erro ao gerar relatório', 'error');
+            }
+        }
+
+        function gerarPDF(manutencoes, tipo) {
+            const mes = document.getElementById('export-mes').value;
+            const ano = document.getElementById('export-ano').value;
+            const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+            const titulo = tipo === 'tudo' ? 'Relatório Completo' : `Relatório ${meses[parseInt(mes) - 1]}/${ano}`;
+
+            let totalCusto = 0;
+            let html = `
+                <html>
+                <head>
+                    <title>${titulo} - CarroIA</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                        h1 { color: #0ea5e9; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px; }
+                        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+                        .logo { font-size: 24px; font-weight: bold; }
+                        .data-geracao { color: #666; font-size: 12px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                        th { background: #0ea5e9; color: white; }
+                        tr:nth-child(even) { background: #f9f9f9; }
+                        .total { margin-top: 20px; text-align: right; font-size: 18px; font-weight: bold; }
+                        .tipo-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; background: #e0f2fe; color: #0369a1; }
+                        @media print { body { padding: 0; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="logo">🚗 CarroIA</div>
+                        <div class="data-geracao">Gerado em: ${new Date().toLocaleString('pt-BR')}</div>
+                    </div>
+                    <h1>${titulo}</h1>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Veículo</th>
+                                <th>Tipo</th>
+                                <th>Título</th>
+                                <th>Descrição</th>
+                                <th>KM</th>
+                                <th>Custo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            manutencoes.forEach(m => {
+                totalCusto += m.custo || 0;
+                html += `
+                    <tr>
+                        <td>${formatDate(m.data)}</td>
+                        <td>${m.marca} ${m.modelo}</td>
+                        <td><span class="tipo-badge">${m.tipo}</span></td>
+                        <td>${m.titulo || '-'}${m.subtitulo ? ` - ${m.subtitulo}` : ''}</td>
+                        <td>${m.descricao || '-'}</td>
+                        <td>${m.km ? m.km.toLocaleString('pt-BR') : '-'}</td>
+                        <td>${formatCurrency(m.custo)}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                    <div class="total">
+                        Total: ${formatCurrency(totalCusto)} (${manutencoes.length} manutenções)
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => printWindow.print(), 500);
+        }
     </script>
 </body>
 

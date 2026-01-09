@@ -82,17 +82,30 @@ app.delete('/api/veiculos/:id', async (req, res) => {
 // Listar todas as manutenções
 app.get('/api/manutencoes', async (req, res) => {
     try {
-        const { veiculo_id } = req.query;
+        const { veiculo_id, mes, ano } = req.query;
         let sql = `
             SELECT m.*, v.marca, v.modelo, v.placa
             FROM manutencoes m
             JOIN veiculos v ON m.veiculo_id = v.id
         `;
         const params = [];
+        const conditions = [];
+
         if (veiculo_id) {
-            sql += ` WHERE m.veiculo_id = $1`;
             params.push(parseInt(veiculo_id));
+            conditions.push(`m.veiculo_id = $${params.length}`);
         }
+
+        if (mes && ano) {
+            const competencia = `${ano}-${mes}`;
+            params.push(competencia);
+            conditions.push(`TO_CHAR(m.data, 'YYYY-MM') = $${params.length}`);
+        }
+
+        if (conditions.length > 0) {
+            sql += ' WHERE ' + conditions.join(' AND ');
+        }
+
         sql += ' ORDER BY m.data DESC, m.created_at DESC';
         const result = await query(sql, params);
         res.json(result.rows);
