@@ -32,6 +32,8 @@ async function initDatabase() {
         id SERIAL PRIMARY KEY,
         veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
         tipo TEXT NOT NULL,
+        titulo TEXT,
+        subtitulo TEXT,
         descricao TEXT,
         data DATE NOT NULL,
         km INTEGER,
@@ -45,13 +47,21 @@ async function initDatabase() {
       )
     `);
 
-    // Adicionar coluna marca_peca se não existir (migration)
+    // Migrations - adicionar colunas se não existirem
     await client.query(`
       DO $$ 
       BEGIN 
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                        WHERE table_name='manutencoes' AND column_name='marca_peca') THEN
           ALTER TABLE manutencoes ADD COLUMN marca_peca TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='manutencoes' AND column_name='titulo') THEN
+          ALTER TABLE manutencoes ADD COLUMN titulo TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='manutencoes' AND column_name='subtitulo') THEN
+          ALTER TABLE manutencoes ADD COLUMN subtitulo TEXT;
         END IF;
       END $$;
     `);

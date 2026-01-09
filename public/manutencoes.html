@@ -383,8 +383,16 @@
                     </div>
                     <input type="hidden" name="tipo" id="input-tipo" required>
                 </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs text-slate-300 mb-1">Título *</label><input type="text"
+                            name="titulo" required placeholder="Ex: Troca de óleo 5W30"
+                            class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm"></div>
+                    <div><label class="block text-xs text-slate-300 mb-1">Subtítulo</label><input type="text"
+                            name="subtitulo" placeholder="Ex: Motor 1.0"
+                            class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm"></div>
+                </div>
                 <div><label class="block text-xs text-slate-300 mb-1">Descrição</label><textarea name="descricao"
-                        rows="2"
+                        rows="2" placeholder="Detalhes adicionais sobre o serviço..."
                         class="input-field w-full px-3 py-2 rounded-xl text-white outline-none text-sm resize-none"></textarea>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -496,6 +504,7 @@
               </div>
               <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 w-fit max-w-[120px] truncate" title="${m.marca} ${m.modelo}">${m.marca} ${m.modelo}</span>
             </div>
+            <p class="text-xs text-white font-medium">${m.titulo || m.tipo}${m.subtitulo ? ` - ${m.subtitulo}` : ''}</p>
             <p class="text-xs text-slate-400 truncate">${m.descricao || 'Sem descrição'}${m.km ? ` • ${m.km.toLocaleString('pt-BR')} km` : ''}</p>
             ${proximaInfo}
           </div>
@@ -526,6 +535,8 @@
         function editManutencao(m) {
             document.getElementById('edit-id').value = m.id;
             document.querySelector('[name="veiculo_id"]').value = m.veiculo_id;
+            document.querySelector('[name="titulo"]').value = m.titulo || '';
+            document.querySelector('[name="subtitulo"]').value = m.subtitulo || '';
             document.querySelector('[name="marca_peca"]').value = m.marca_peca || '';
             document.querySelector('[name="descricao"]').value = m.descricao || '';
             // Formatar data para o input (precisa ser YYYY-MM-DD)
