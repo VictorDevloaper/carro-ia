@@ -326,6 +326,18 @@
                     class="input-field px-3 py-2 rounded-xl text-white outline-none text-sm flex-1">
                     <option value="">Todos os veículos</option>
                 </select>
+                <select id="filtro-tipo"
+                    class="input-field px-3 py-2 rounded-xl text-white outline-none text-sm flex-1">
+                    <option value="">Todas as categorias</option>
+                    <option value="Troca de Óleo">🛢️ Troca de Óleo</option>
+                    <option value="Revisão">🔍 Revisão</option>
+                    <option value="Pneus">🛞 Pneus</option>
+                    <option value="Freios">🛑 Freios</option>
+                    <option value="Filtros">🌀 Filtros</option>
+                    <option value="Bateria">🔋 Bateria</option>
+                    <option value="Suspensão">🔩 Suspensão</option>
+                    <option value="Outro">⚙️ Outro</option>
+                </select>
                 <button onclick="openExportModal()"
                     class="hidden md:flex px-4 py-2 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-700/50 transition-all items-center gap-2 text-sm"><span>📄</span>
                     Exportar</button>
@@ -516,6 +528,7 @@
             document.querySelector('input[name="data"]').valueAsDate = new Date();
             await loadVeiculos(); await loadManutencoes();
             document.getElementById('filtro-veiculo').addEventListener('change', loadManutencoes);
+            document.getElementById('filtro-tipo').addEventListener('change', loadManutencoes);
             const params = new URLSearchParams(window.location.search);
             if (params.get('veiculo')) { document.getElementById('filtro-veiculo').value = params.get('veiculo'); loadManutencoes(); }
             if (window.location.hash === '#nova') openModal();
@@ -533,7 +546,12 @@
         }
         async function loadManutencoes() {
             const vid = document.getElementById('filtro-veiculo').value;
-            const url = vid ? `/api/manutencoes?veiculo_id=${vid}` : '/api/manutencoes';
+            const tipo = document.getElementById('filtro-tipo').value;
+            let url = '/api/manutencoes';
+            const params = [];
+            if (vid) params.push(`veiculo_id=${vid}`);
+            if (tipo) params.push(`tipo=${encodeURIComponent(tipo)}`);
+            if (params.length > 0) url += '?' + params.join('&');
             const manutencoes = await (await fetch(url)).json();
             const lista = document.getElementById('manutencoes-lista');
             if (!manutencoes.length) { lista.innerHTML = '<div class="text-center py-12 text-slate-500 animate-fade-up"><span class="text-5xl block mb-3 animate-float">🔧</span><p>Nenhuma manutenção</p></div>'; return; }

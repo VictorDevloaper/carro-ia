@@ -82,7 +82,7 @@ app.delete('/api/veiculos/:id', async (req, res) => {
 // Listar todas as manutenções
 app.get('/api/manutencoes', async (req, res) => {
     try {
-        const { veiculo_id, mes, ano } = req.query;
+        const { veiculo_id, mes, ano, tipo } = req.query;
         let sql = `
             SELECT m.*, v.marca, v.modelo, v.placa
             FROM manutencoes m
@@ -94,6 +94,11 @@ app.get('/api/manutencoes', async (req, res) => {
         if (veiculo_id) {
             params.push(parseInt(veiculo_id));
             conditions.push(`m.veiculo_id = $${params.length}`);
+        }
+
+        if (tipo) {
+            params.push(tipo);
+            conditions.push(`m.tipo = $${params.length}`);
         }
 
         if (mes && ano) {
