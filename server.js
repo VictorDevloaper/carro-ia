@@ -271,7 +271,100 @@ app.get('/api/dashboard', async (req, res) => {
     }
 });
 
-// Inicialização
+// ============ API BACKUP & RESTORE ============
+
+// Backup (Exportar dados)
+app.get('/api/backup', async (req, res) => {
+    try {
+        const veiculos = await query('SELECT * FROM veiculos ORDER BY id');
+        const manutencoes = await query('SELECT * FROM manutencoes ORDER BY id');
+
+        const backupData = {
+            timestamp: new Date().toISOString(),
+            version: '1.0',
+            data: {
+                veiculos: veiculos.rows,
+                manutencoes: manutencoes.rows
+            }
+        };
+
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename=backup-carroia-${new Date().toISOString().slice(0, 10)}.json`);
+        res.json(backupData);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Restore (Importar dados)
+app.post('/api/restore', async (req, res) => {
+    const client = await initDatabase();
+    // Nota: initDatabase retorna undefined, precisamos expor o pool ou usar query direta com transação.
+    // O helper query() não suporta transação facilmente pois faz pool.query direto.
+    // Vamos importar o pool de database.js ou ajustar o import.
+    // Verificando imports... const { initDatabase, query } = require('./database');
+    // O arquivo database.js exporta pool também. Vamos precisar ajustar o require no topo ou usar querys individuais (perigoso sem transação).
+
+    // Melhor abordagem: Ajustar o topo do arquivo para importar pool também. 
+    // Mas para evitar editar o topo agora, vamos assumir que o usuário aceita um "soft" restore ou vou usar o require aqui dentro se necessário, 
+    // MAS espere, eu vi o database.js: module.exports = { initDatabase, query, prepare, pool };
+    // Então posso requerer o pool aqui se eu mudar o require lá em cima, ou apenas fazer:
+    const { pool } = require('./database');
+
+    const clientTransaction = await pool.connect();
+
+    try {
+        const { data } = req.body;
+        if (!data || !data.veiculos || !data.manutencoes) {
+            throw new Error('Formato de backup inválido');
+        }
+
+        await clientTransaction.query('BEGIN');
+
+        // 1. Limpar tabelas existentes (ordem importa por causa da FK)
+        await clientTransaction.query('DELETE FROM manutencoes');
+        await clientTransaction.query('DELETE FROM veiculos');
+
+        // 2. Inserir Veículos
+        if (data.veiculos.length > 0) {
+            for (const v of data.veiculos) {
+                await clientTransaction.query(
+                    `INSERT INTO veiculos (id, marca, modelo, ano, placa, cor, km_atual, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    [v.id, v.marca, v.modelo, v.ano, v.placa, v.cor, v.km_atual, v.created_at]
+                );
+            }
+            // Ajustar sequência do ID dos veículos
+            const maxIdResult = await clientTransaction.query('SELECT MAX(id) as max_id FROM veiculos');
+            const maxId = maxIdResult.rows[0].max_id || 0;
+            await clientTransaction.query(`SELECT setval('veiculos_id_seq', $1)`, [maxId]);
+        }
+
+        // 3. Inserir Manutenções
+        if (data.manutencoes.length > 0) {
+            for (const m of data.manutencoes) {
+                await clientTransaction.query(
+                    `INSERT INTO manutencoes (id, veiculo_id, tipo, titulo, subtitulo, descricao, data, km, custo, local, observacoes, proximo_km, proxima_data, marca_peca, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+                    [m.id, m.veiculo_id, m.tipo, m.titulo, m.subtitulo, m.descricao, m.data, m.km, m.custo, m.local, m.observacoes, m.proximo_km, m.proxima_data, m.marca_peca, m.created_at]
+                );
+            }
+            // Ajustar sequência do ID das manutenções
+            const maxIdResult = await clientTransaction.query('SELECT MAX(id) as max_id FROM manutencoes');
+            const maxId = maxIdResult.rows[0].max_id || 0;
+            await clientTransaction.query(`SELECT setval('manutencoes_id_seq', $1)`, [maxId]);
+        }
+
+        await clientTransaction.query('COMMIT');
+        res.json({ message: 'Restauração concluída com sucesso! Recarregue a página.' });
+    } catch (error) {
+        await clientTransaction.query('ROLLBACK');
+        console.error('Erro no restore:', error);
+        res.status(500).json({ error: 'Falha na restauração: ' + error.message });
+    } finally {
+        clientTransaction.release();
+    }
+});
 async function startServer() {
     await initDatabase();
 
