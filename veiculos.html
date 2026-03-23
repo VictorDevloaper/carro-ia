@@ -354,12 +354,18 @@
     </div>
     <div id="toast" class="toast"></div>
     <script src="js/app.js"></script>
-    <script>
+    <script type="module">
+        import { supabase } from './src/supabase.js';
+
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('open'); }
+        window.toggleSidebar = toggleSidebar;
+
         document.addEventListener('DOMContentLoaded', async () => { document.body.classList.add('page-loaded'); await loadVeiculos(); if (window.location.hash === '#novo') openModal(); });
+
         async function loadVeiculos() {
-            const response = await fetch('/api/veiculos'); const veiculos = await response.json(); const grid = document.getElementById('veiculos-grid');
-            if (!veiculos.length) { grid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-500 animate-fade-up"><span class="text-5xl block mb-3 animate-float">🚙</span><p>Nenhum veículo</p></div>'; return; }
+            const { data: veiculos, error } = await supabase.from('veiculos').select('*').order('created_at', { ascending: false });
+            const grid = document.getElementById('veiculos-grid');
+            if (error || !veiculos || !veiculos.length) { grid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-500 animate-fade-up"><span class="text-5xl block mb-3 animate-float">🚙</span><p>Nenhum veículo</p></div>'; return; }
             grid.innerHTML = veiculos.map((v, i) => `
         <div class="vehicle-card rounded-xl p-4 animate-fade-up" style="animation-delay: ${i * 0.1}s; opacity: 0;">
           <div class="flex justify-between mb-3"><div class="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center text-2xl car-icon">🚗</div><button onclick="deleteVeiculo(${v.id})" class="delete-btn text-slate-500">🗑️</button></div>
@@ -368,15 +374,28 @@
           <a href="manutencoes.html?veiculo=${v.id}" class="mt-3 block text-center py-2 rounded-lg border border-slate-600 text-xs hover:bg-sky-500/10 hover:border-sky-500/50 transition-all">Ver Manutenções</a>
         </div>`).join('');
         }
+        window.loadVeiculos = loadVeiculos;
+
         function openModal() { document.getElementById('modal-veiculo').classList.add('active'); }
+        window.openModal = openModal;
+
         function closeModal() { document.getElementById('modal-veiculo').classList.remove('active'); document.getElementById('form-veiculo').reset(); }
+        window.closeModal = closeModal;
+
         document.getElementById('form-veiculo').addEventListener('submit', async (e) => {
             e.preventDefault(); const data = Object.fromEntries(new FormData(e.target));
             if (data.ano) data.ano = parseInt(data.ano); if (data.km_atual) data.km_atual = parseInt(data.km_atual);
-            const res = await fetch('/api/veiculos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-            if (res.ok) { showToast('Veículo cadastrado! 🚗', 'success'); closeModal(); await loadVeiculos(); } else showToast('Erro ao cadastrar', 'error');
+            const { error } = await supabase.from('veiculos').insert([data]);
+            if (!error) { showToast('Veículo cadastrado! 🚗', 'success'); closeModal(); await loadVeiculos(); } else showToast('Erro ao cadastrar', 'error');
         });
-        async function deleteVeiculo(id) { if (!confirm('Excluir este veículo?')) return; await fetch('/api/veiculos/' + id, { method: 'DELETE' }); showToast('Veículo excluído!', 'success'); loadVeiculos(); }
+
+        async function deleteVeiculo(id) { 
+            if (!confirm('Excluir este veículo? E TODAS as manutenções associadas?')) return; 
+            await supabase.from('manutencoes').delete().eq('veiculo_id', id);
+            const { error } = await supabase.from('veiculos').delete().eq('id', id); 
+            if(!error) { showToast('Veículo excluído!', 'success'); loadVeiculos(); } else { showToast('Erro ao excluir', 'error'); }
+        }
+        window.deleteVeiculo = deleteVeiculo;
     </script>
 </body>
 

@@ -518,12 +518,17 @@
 
   <script src="js/backup.js"></script>
   <script src="js/app.js"></script>
-  <script>
+  <script type="module">
+    import { supabase } from './src/supabase.js';
+
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('open'); }
+    window.toggleSidebar = toggleSidebar;
+
     document.addEventListener('DOMContentLoaded', async () => {
       document.body.classList.add('page-loaded');
       await loadDashboard();
     });
+    
     function animateCounter(el, target) {
       let current = 0;
       const increment = target / 30;
@@ -533,17 +538,44 @@
         el.textContent = Math.floor(current);
       }, 30);
     }
+    
     async function loadDashboard() {
       try {
-        const response = await fetch('/api/dashboard');
-        const data = await response.json();
-        animateCounter(document.getElementById('stat-veiculos'), data.totalVeiculos);
-        animateCounter(document.getElementById('stat-manutencoes'), data.totalManutencoes);
-        document.getElementById('stat-custo-total').textContent = formatCurrency(data.custoTotal);
-        document.getElementById('stat-custo-mes').textContent = formatCurrency(data.custoMesAtual);
+        const [{ count: totalVeiculos }, { count: totalManutencoes }, { data: manutencoes }] = await Promise.all([
+          supabase.from('veiculos').select('*', { count: 'exact', head: true }),
+          supabase.from('manutencoes').select('*', { count: 'exact', head: true }),
+          supabase.from('manutencoes').select('*, veiculos(marca, modelo, placa)').order('data', { ascending: false })
+        ]);
+
+        const custoTotal = manutencoes?.reduce((sum, m) => sum + (m.custo || 0), 0) || 0;
+        
+        const now = new Date();
+        const mesAtualStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const custoMesAtual = manutencoes?.filter(m => m.data?.startsWith(mesAtualStr)).reduce((sum, m) => sum + (m.custo || 0), 0) || 0;
+
+        const ultimasManutencoes = (manutencoes || []).slice(0, 5).map(m => ({
+            ...m,
+            marca: m.veiculos?.marca,
+            modelo: m.veiculos?.modelo,
+            placa: m.veiculos?.placa
+        }));
+
+        const tiposMap = {};
+        (manutencoes || []).forEach(m => {
+            if(!tiposMap[m.tipo]) tiposMap[m.tipo] = { count: 0, custo_total: 0 };
+            tiposMap[m.tipo].count++;
+            tiposMap[m.tipo].custo_total += (m.custo || 0);
+        });
+        const manutencoesPorTipo = Object.entries(tiposMap).map(([tipo, data]) => ({ tipo, ...data })).sort((a,b) => b.count - a.count);
+
+        animateCounter(document.getElementById('stat-veiculos'), totalVeiculos || 0);
+        animateCounter(document.getElementById('stat-manutencoes'), totalManutencoes || 0);
+        document.getElementById('stat-custo-total').textContent = formatCurrency(custoTotal);
+        document.getElementById('stat-custo-mes').textContent = formatCurrency(custoMesAtual);
+        
         const listaManutencoes = document.getElementById('lista-manutencoes');
-        if (data.ultimasManutencoes.length > 0) {
-          listaManutencoes.innerHTML = data.ultimasManutencoes.map((m, i) => `
+        if (ultimasManutencoes.length > 0) {
+          listaManutencoes.innerHTML = ultimasManutencoes.map((m, i) => `
             <div class="maintenance-row flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl border border-slate-700/50 animate-fade-up" style="animation-delay: ${0.1 * i}s; opacity: 0;">
               <div class="icon-badge ${getTipoColor(m.tipo)} w-8 h-8 md:w-10 md:h-10 text-sm md:text-lg">${getTipoIcon(m.tipo)}</div>
               <div class="flex-1 min-w-0">
@@ -556,11 +588,14 @@
               <div class="text-right"><p class="font-semibold text-white text-sm md:text-base">${formatCurrency(m.custo)}</p></div>
             </div>
           `).join('');
+        } else {
+            listaManutencoes.innerHTML = '<div class="text-center py-6 md:py-8 text-slate-500"><span class="text-3xl md:text-4xl block mb-2 md:mb-3 animate-bounce">🔧</span><p class="text-sm md:text-base">Nenhuma manutenção registrada</p><a href="manutencoes.html" class="text-sky-400 text-xs md:text-sm hover:underline">Registrar primeira manutenção</a></div>';
         }
+
         const listaTipos = document.getElementById('lista-tipos');
-        if (data.manutencoesPorTipo.length > 0) {
-          const maxCount = Math.max(...data.manutencoesPorTipo.map(t => t.count));
-          listaTipos.innerHTML = data.manutencoesPorTipo.map((t, i) => `
+        if (manutencoesPorTipo.length > 0) {
+          const maxCount = Math.max(...manutencoesPorTipo.map(t => t.count));
+          listaTipos.innerHTML = manutencoesPorTipo.map((t, i) => `
             <div class="space-y-2 animate-fade-up" style="animation-delay: ${0.1 * i}s; opacity: 0;">
               <div class="flex justify-between text-xs md:text-sm"><span class="text-slate-300">${t.tipo}</span><span class="text-slate-500">${t.count}x • ${formatCurrency(t.custo_total)}</span></div>
               <div class="h-2 bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-sky-500 to-sky-400 rounded-full transition-all duration-1000" style="width: 0%; animation: growBar 1s ${0.2 * i}s forwards;"></div></div>
@@ -569,10 +604,12 @@
           // Animate bars
           setTimeout(() => {
             document.querySelectorAll('#lista-tipos .h-2 > div').forEach((bar, i) => {
-              const t = data.manutencoesPorTipo[i];
+              const t = manutencoesPorTipo[i];
               bar.style.width = `${(t.count / maxCount) * 100}%`;
             });
           }, 100);
+        } else {
+            listaTipos.innerHTML = '<div class="text-center py-6 md:py-8 text-slate-500"><span class="text-2xl md:text-3xl block mb-2 animate-float">📊</span><p class="text-xs md:text-sm">Sem dados ainda</p></div>';
         }
       } catch (error) { console.error('Erro:', error); }
     }

@@ -498,31 +498,26 @@
     </div>
     <div id="toast" class="toast"></div>
     <script src="js/app.js"></script>
-    <script>
+    <script type="module">
+        import { supabase } from './src/supabase.js';
+
         let tipoSelecionado = '';
 
-        // Converte data do PostgreSQL para formato do input (YYYY-MM-DD)
         function formatDateForInput(dateValue) {
             if (!dateValue) return '';
-            // Se já está no formato correto
-            if (typeof dateValue === 'string' && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                return dateValue;
-            }
-            // Se é uma data ISO com timezone
-            if (typeof dateValue === 'string' && dateValue.includes('T')) {
-                return dateValue.split('T')[0];
-            }
-            // Tenta converter de Date object
+            if (typeof dateValue === 'string' && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) return dateValue;
+            if (typeof dateValue === 'string' && dateValue.includes('T')) return dateValue.split('T')[0];
             try {
                 const date = new Date(dateValue);
-                if (!isNaN(date.getTime())) {
-                    return date.toISOString().split('T')[0];
-                }
+                if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
             } catch (e) { }
             return '';
         }
+        window.formatDateForInput = formatDateForInput;
 
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('open'); }
+        window.toggleSidebar = toggleSidebar;
+
         document.addEventListener('DOMContentLoaded', async () => {
             document.body.classList.add('page-loaded');
             document.querySelector('input[name="data"]').valueAsDate = new Date();
@@ -539,20 +534,25 @@
                 });
             });
         });
+
         async function loadVeiculos() {
-            const veiculos = await (await fetch('/api/veiculos')).json();
+            const { data: veiculos } = await supabase.from('veiculos').select('*').order('created_at', { ascending: false });
             const s1 = document.getElementById('select-veiculo'), s2 = document.getElementById('filtro-veiculo');
-            veiculos.forEach(v => { s1.add(new Option(`${v.marca} ${v.modelo}`, v.id)); s2.add(new Option(`${v.marca} ${v.modelo}`, v.id)); });
+            (veiculos || []).forEach(v => { s1.add(new Option(`${v.marca} ${v.modelo}`, v.id)); s2.add(new Option(`${v.marca} ${v.modelo}`, v.id)); });
         }
+        window.loadVeiculos = loadVeiculos;
+
         async function loadManutencoes() {
             const vid = document.getElementById('filtro-veiculo').value;
             const tipo = document.getElementById('filtro-tipo').value;
-            let url = '/api/manutencoes';
-            const params = [];
-            if (vid) params.push(`veiculo_id=${vid}`);
-            if (tipo) params.push(`tipo=${encodeURIComponent(tipo)}`);
-            if (params.length > 0) url += '?' + params.join('&');
-            const manutencoes = await (await fetch(url)).json();
+            
+            let query = supabase.from('manutencoes').select('*, veiculos(marca, modelo, placa)').order('data', { ascending: false }).order('created_at', { ascending: false });
+            if (vid) { query = query.eq('veiculo_id', vid); }
+            if (tipo) { query = query.eq('tipo', tipo); }
+
+            const { data: rawManutencoes } = await query;
+            const manutencoes = (rawManutencoes || []).map(m => ({ ...m, marca: m.veiculos?.marca, modelo: m.veiculos?.modelo, placa: m.veiculos?.placa }));
+
             const lista = document.getElementById('manutencoes-lista');
             if (!manutencoes.length) { lista.innerHTML = '<div class="text-center py-12 text-slate-500 animate-fade-up"><span class="text-5xl block mb-3 animate-float">🔧</span><p>Nenhuma manutenção</p></div>'; return; }
             lista.innerHTML = manutencoes.map((m, i) => {
@@ -586,11 +586,15 @@
         </div>`;
             }).join('');
         }
+        window.loadManutencoes = loadManutencoes;
+
         function openModal(isEdit = false) {
             document.getElementById('modal-titulo').textContent = isEdit ? 'Editar Manutenção' : 'Nova Manutenção';
             document.getElementById('modal-subtitulo').textContent = isEdit ? 'Atualize os detalhes do serviço' : 'Registre os detalhes do serviço realizado';
             document.getElementById('modal-manutencao').classList.add('active');
         }
+        window.openModal = openModal;
+
         function closeModal() {
             document.getElementById('modal-manutencao').classList.remove('active');
             document.getElementById('form-manutencao').reset();
@@ -599,21 +603,21 @@
             tipoSelecionado = '';
             document.querySelector('input[name="data"]').valueAsDate = new Date();
         }
-        function editManutencao(m) {
+        window.closeModal = closeModal;
+
+        window.editManutencao = function(m) {
             document.getElementById('edit-id').value = m.id;
             document.querySelector('[name="veiculo_id"]').value = m.veiculo_id;
             document.querySelector('[name="titulo"]').value = m.titulo || '';
             document.querySelector('[name="subtitulo"]').value = m.subtitulo || '';
             document.querySelector('[name="marca_peca"]').value = m.marca_peca || '';
             document.querySelector('[name="descricao"]').value = m.descricao || '';
-            // Formatar data para o input (precisa ser YYYY-MM-DD)
             document.querySelector('[name="data"]').value = formatDateForInput(m.data);
             document.querySelector('[name="km"]').value = m.km || '';
             document.querySelector('[name="custo"]').value = m.custo ? m.custo.toString().replace('.', ',') : '';
             document.querySelector('[name="local"]').value = m.local || '';
             document.querySelector('[name="proximo_km"]').value = m.proximo_km || '';
             document.querySelector('[name="proxima_data"]').value = formatDateForInput(m.proxima_data);
-            // Selecionar tipo
             document.querySelectorAll('.tipo-btn').forEach(btn => {
                 btn.classList.remove('selected');
                 if (btn.dataset.tipo === m.tipo) {
@@ -623,78 +627,102 @@
                 }
             });
             openModal(true);
-        }
+        };
+
         document.getElementById('form-manutencao').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!tipoSelecionado) { showToast('Selecione um tipo!', 'error'); return; }
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
+            
             data.veiculo_id = parseInt(data.veiculo_id);
+            if (data.custo) data.custo = parseFloat(String(data.custo).replace(',', '.')) || 0;
+            if (data.km) data.km = parseInt(String(data.km).replace(/\D/g, '')) || null;
+            if (data.proximo_km) data.proximo_km = parseInt(String(data.proximo_km).replace(/\D/g, '')) || null;
+            
+            // Clean empty strings to null for DB compliance
+            Object.keys(data).forEach(k => { if(data[k] === '') data[k] = null; });
 
             const editId = document.getElementById('edit-id').value;
             const isEdit = editId !== '';
-            const url = isEdit ? `/api/manutencoes/${editId}` : '/api/manutencoes';
-            const method = isEdit ? 'PUT' : 'POST';
+            
+            let resError;
+            if (isEdit) {
+                const { error } = await supabase.from('manutencoes').update(data).eq('id', editId);
+                resError = error;
+            } else {
+                const { error } = await supabase.from('manutencoes').insert([data]);
+                resError = error;
+            }
 
-            const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-            if (res.ok) {
+            // Sync Veiculo KM
+            if (data.km && !resError) {
+                const { data: v } = await supabase.from('veiculos').select('km_atual').eq('id', data.veiculo_id).single();
+                if(v && (!v.km_atual || data.km > v.km_atual)) {
+                    await supabase.from('veiculos').update({ km_atual: data.km }).eq('id', data.veiculo_id);
+                }
+            }
+
+            if (!resError) {
                 showToast(isEdit ? 'Manutenção atualizada! ✅' : 'Manutenção registrada! 🔧', 'success');
                 closeModal();
                 loadManutencoes();
             } else showToast('Erro ao salvar', 'error');
         });
-        async function deleteManutencao(id) { if (!confirm('Excluir esta manutenção?')) return; await fetch('/api/manutencoes/' + id, { method: 'DELETE' }); showToast('Manutenção excluída!', 'success'); loadManutencoes(); }
 
-        // Funções de Exportação
-        function openExportModal() {
-            // Popular select de anos
+        window.deleteManutencao = async function(id) { 
+            if (!confirm('Excluir esta manutenção?')) return; 
+            const { error } = await supabase.from('manutencoes').delete().eq('id', id); 
+            if(!error){ showToast('Manutenção excluída!', 'success'); loadManutencoes(); } else { showToast('Erro!', 'error');}
+        };
+
+        window.openExportModal = function() {
             const selectAno = document.getElementById('export-ano');
             selectAno.innerHTML = '';
             const anoAtual = new Date().getFullYear();
-            for (let ano = anoAtual; ano >= anoAtual - 5; ano--) {
-                selectAno.add(new Option(ano, ano));
-            }
-            // Selecionar mês atual
+            for (let ano = anoAtual; ano >= anoAtual - 5; ano--) { selectAno.add(new Option(ano, ano)); }
             const mesAtual = String(new Date().getMonth() + 1).padStart(2, '0');
             document.getElementById('export-mes').value = mesAtual;
             document.getElementById('modal-exportar').classList.add('active');
-        }
+        };
 
-        function closeExportModal() {
-            document.getElementById('modal-exportar').classList.remove('active');
-        }
+        window.closeExportModal = function() { document.getElementById('modal-exportar').classList.remove('active'); };
 
-        async function exportarRelatorio(tipo) {
+        window.exportarRelatorio = async function(tipoExportacao) {
             const vid = document.getElementById('filtro-veiculo').value;
-            let url = '/api/manutencoes';
-            let params = [];
-
-            if (vid) params.push(`veiculo_id=${vid}`);
-
-            if (tipo === 'competencia') {
+            let query = supabase.from('manutencoes').select('*, veiculos(marca, modelo, placa)').order('data', { ascending: false });
+            
+            if (vid) query = query.eq('veiculo_id', vid);
+            
+            if (tipoExportacao === 'competencia') {
                 const mes = document.getElementById('export-mes').value;
                 const ano = document.getElementById('export-ano').value;
-                params.push(`mes=${mes}`);
-                params.push(`ano=${ano}`);
+                const start = `${ano}-${mes}-01`;
+                const endDate = new Date(ano, parseInt(mes), 0);
+                const end = `${ano}-${mes}-${endDate.getDate()}`;
+                query = query.gte('data', start).lte('data', end);
             }
 
-            if (params.length > 0) url += '?' + params.join('&');
-
             try {
-                const manutencoes = await (await fetch(url)).json();
+                const { data: rawManutencoes, error } = await query;
+                if(error) throw error;
+                const manutencoes = (rawManutencoes || []).map(m => ({ ...m, marca: m.veiculos?.marca, modelo: m.veiculos?.modelo, placa: m.veiculos?.placa }));
+
                 if (!manutencoes.length) {
                     showToast('Nenhuma manutenção encontrada!', 'error');
                     return;
                 }
-                gerarPDF(manutencoes, tipo);
+                gerarPDF(manutencoes, tipoExportacao);
                 closeExportModal();
                 showToast('Relatório gerado com sucesso! 📄', 'success');
             } catch (error) {
+                console.error(error);
                 showToast('Erro ao gerar relatório', 'error');
             }
-        }
+        };
 
-        function gerarPDF(manutencoes, tipo) {
+        window.gerarPDF = function(manutencoes, tipo) {
+            // Reusing existing logic...
             const mes = document.getElementById('export-mes').value;
             const ano = document.getElementById('export-ano').value;
             const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -768,11 +796,13 @@
             `;
 
             const printWindow = window.open('', '_blank');
-            printWindow.document.write(html);
-            printWindow.document.close();
-            printWindow.focus();
-            setTimeout(() => printWindow.print(), 500);
-        }
+            if (printWindow) {
+                printWindow.document.write(html);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 500);
+            }
+        };
     </script>
 </body>
 
