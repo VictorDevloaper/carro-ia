@@ -45,11 +45,12 @@ function getTipoIcon(tipo) {
     const icons = {
         'Troca de Óleo': '🛢️',
         'Revisão': '🔍',
-        'Pneus': '🛞',
+        'Pneus': '🔘',
         'Freios': '🛑',
         'Filtros': '🌀',
         'Bateria': '🔋',
         'Suspensão': '🔩',
+        'Elétrica': '⚡',
         'Outro': '⚙️'
     };
     return icons[tipo] || '🔧';
@@ -64,6 +65,7 @@ function getTipoColor(tipo) {
         'Filtros': 'bg-cyan-500/20 text-cyan-400',
         'Bateria': 'bg-green-500/20 text-green-400',
         'Suspensão': 'bg-purple-500/20 text-purple-400',
+        'Elétrica': 'bg-yellow-500/20 text-yellow-400',
         'Outro': 'bg-gray-500/20 text-gray-400'
     };
     return colors[tipo] || 'bg-sky-500/20 text-sky-400';
